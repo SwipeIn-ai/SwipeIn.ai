@@ -1,5 +1,7 @@
 package com.swipeapply.app.ui.screens
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -7,8 +9,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,12 +32,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
 import com.swipeapply.app.ui.theme.*
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
+import com.swipeapply.app.ui.viewmodel.UndoableAction
 
 /**
  * Main home screen with card stack and swipe actions.
@@ -52,6 +60,9 @@ fun HomeScreen(
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
     )
+    
+    // Undo history dialog state
+    var showUndoDialog by remember { mutableStateOf(false) }
     
     LaunchedEffect(uiState.showBottomSheet) {
         if (uiState.showBottomSheet) {
@@ -75,6 +86,11 @@ fun HomeScreen(
                 onUndo = {
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.undoLastSwipe()
+                },
+                onUndoLongPress = {
+                    if (uiState.undoHistory.isNotEmpty()) {
+                        showUndoDialog = true
+                    }
                 }
             )
             
@@ -149,13 +165,31 @@ fun HomeScreen(
                 )
             }
         }
+        
+        // Undo history dialog
+        if (showUndoDialog) {
+            UndoHistoryDialog(
+                undoHistory = uiState.undoHistory,
+                onDismiss = { showUndoDialog = false },
+                onUndoCount = { count ->
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    viewModel.undoSwipes(count)
+                    showUndoDialog = false
+                },
+                onClearHistory = {
+                    viewModel.clearUndoHistory()
+                    showUndoDialog = false
+                }
+            )
+        }
     }
 }
 
 @Composable
 private fun HomeTopBar(
     stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
-    onUndo: () -> Unit
+    onUndo: () -> Unit,
+    onUndoLongPress: () -> Unit
 ) {
     Surface(
         color = BackgroundLight,
@@ -190,18 +224,53 @@ private fun HomeTopBar(
                     )
                 }
                 
-                // Undo button
-                IconButton(onClick = onUndo) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Undo",
-                        tint = TextSecondary
-                    )
+                // Undo button with count badge
+                Box {
+                    IconButton(
+    onClick = onUndo,
+    modifier = Modifier.pointerInput(Unit) {
+        detectTapGestures(
+            onLongPress = { onUndoLongPress() }
+        )
+    }
+) {
+    Icon(
+        imageVector = Icons.Default.Refresh,
+        contentDescription = "Undo (long press for history)",
+        tint = if (stats.undoCount > 0) Primary else TextSecondary
+    )
+}
+
+                    
+                    // Undo count badge
+                    if (stats.undoCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Primary,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(16.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Text(
+                                    text = if (stats.undoCount > 9) "9+" else stats.undoCount.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
 
 @Composable
 private fun StatBadge(
@@ -512,6 +581,154 @@ private fun CompanyDetailSheet(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun UndoHistoryDialog(
+    undoHistory: List<UndoableAction>,
+    onDismiss: () -> Unit,
+    onUndoCount: (Int) -> Unit,
+    onClearHistory: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Undo History",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "${undoHistory.size} actions can be undone",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // History list
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(undoHistory.reversed()) { action ->
+                        UndoHistoryItem(action = action)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Undo all button
+                TextButton(
+                    onClick = { onUndoCount(undoHistory.size) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Primary
+                    )
+                ) {
+                    Text("Undo All")
+                }
+                
+                // Undo last 5
+                if (undoHistory.size >= 5) {
+                    TextButton(
+                        onClick = { onUndoCount(5) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Primary
+                        )
+                    ) {
+                        Text("Undo 5")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onClearHistory,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = AccentRed
+                    )
+                ) {
+                    Text("Clear")
+                }
+                
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        },
+        containerColor = BackgroundCard,
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+@Composable
+private fun UndoHistoryItem(action: UndoableAction) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = BackgroundSecondary,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = action.card.company.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = action.card.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            
+            // Direction badge
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (action.result.isInterested) AccentGreenLight else AccentRedLight
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (action.result.isInterested) Icons.Default.Favorite else Icons.Default.Close,
+                        contentDescription = null,
+                        tint = if (action.result.isInterested) AccentGreen else AccentRed,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = if (action.result.isInterested) "Liked" else "Skipped",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (action.result.isInterested) AccentGreen else AccentRed,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }

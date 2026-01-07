@@ -66,7 +66,7 @@ fun SwipeCardStack(
                 label = "cardOffset"
             )
             
-            // Only the top card is swipeable
+            // Only the top card is swipeable, but all cards are clickable
             if (index == 0) {
                 val swipeState = rememberSwipeCardState { direction ->
                     onCardSwiped(card, direction)
@@ -93,7 +93,7 @@ fun SwipeCardStack(
                     }
                 }
             } else {
-                // Background cards (not interactive)
+                // Background cards (interactive but not swipeable)
                 key(card.id) {
                     Box(
                         modifier = Modifier.graphicsLayer {
@@ -106,7 +106,7 @@ fun SwipeCardStack(
                             jobCard = card,
                             swipeProgress = 0f,
                             swipeDirection = SwipeDirection.NONE,
-                            onClick = { }
+                            onClick = { onCardClicked(card) }
                         )
                     }
                 }
