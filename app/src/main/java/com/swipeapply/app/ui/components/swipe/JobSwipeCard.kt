@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
+import com.swipeapply.app.ui.components.TechStackIcons
 import com.swipeapply.app.ui.theme.*
 
 /**
@@ -253,17 +256,29 @@ private fun TechStackChips(techStack: List<String>) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 rowItems.forEach { tech ->
+                    val techIcon = TechStackIcons.getIcon(tech)
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = BackgroundSecondary
                     ) {
-                        Text(
-                            text = tech,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = techIcon.icon,
+                                contentDescription = null,
+                                tint = techIcon.color,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = tech,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }

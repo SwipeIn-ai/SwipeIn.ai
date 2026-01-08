@@ -61,6 +61,11 @@ dependencies {
     // Accompanist (for system UI controller)
     implementation(libs.accompanist.systemuicontroller)
     
+    // Shimmer effect for loading states
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.3.0")
+
+    implementation("androidx.compose.material:material-icons-extended")
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -21,9 +21,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -265,16 +267,29 @@ private fun CopyButton(
     isCopied: Boolean,
     onClick: () -> Unit
 ) {
-    Button(
-        onClick = onClick,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isCopied) AccentGreen else Primary
-        )
+            .height(56.dp)
+            .background(
+                brush = if (isCopied) {
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(AccentGreen, AccentGreen.copy(alpha = 0.8f))
+                    )
+                } else {
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(GradientStart, GradientEnd)
+                    )
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clip(RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center
     ) {
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxSize()
+        ) {
         AnimatedVisibility(
             visible = isCopied,
             enter = fadeIn() + scaleIn(),
@@ -287,12 +302,14 @@ private fun CopyButton(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = Color.White
                 )
                 Text(
                     text = "Copied!",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
         }
@@ -309,14 +326,17 @@ private fun CopyButton(
                 Icon(
                     imageVector = Icons.Default.Share,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = Color.White
                 )
                 Text(
                     text = "Copy email",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
+        }
         }
     }
 }

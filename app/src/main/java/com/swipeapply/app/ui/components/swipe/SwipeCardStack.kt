@@ -41,66 +41,43 @@ fun SwipeCardStack(
         contentAlignment = Alignment.Center
     ) {
         // Render cards in reverse order (bottom to top)
+        // Background cards rendered first (so they appear behind)
         visibleCards.asReversed().forEachIndexed { reversedIndex, card ->
             val index = visibleCards.size - 1 - reversedIndex
             
-            // Calculate scale and offset for depth effect
-            val targetScale = 1f - (index * 0.05f)
-            val targetOffset = index * 8f
-            
-            val scale by animateFloatAsState(
-                targetValue = targetScale,
-                animationSpec = spring(
-                    dampingRatio = 0.8f,
-                    stiffness = 300f
-                ),
-                label = "cardScale"
-            )
-            
-            val offset by animateFloatAsState(
-                targetValue = targetOffset,
-                animationSpec = spring(
-                    dampingRatio = 0.8f,
-                    stiffness = 300f
-                ),
-                label = "cardOffset"
-            )
-            
-            // Only the top card is swipeable, but all cards are clickable
-            if (index == 0) {
-                val swipeState = rememberSwipeCardState { direction ->
-                    onCardSwiped(card, direction)
-                }
+            // Only render background cards in this loop
+            if (index > 0) {
+                // Calculate scale and offset for depth effect
+                val targetScale = 1f - (index * 0.05f)
+                val targetOffset = index * 8f
                 
-                // Expose swipe trigger
-                onSwipeTriggered?.let { trigger ->
-                    // This allows external buttons to trigger swipes
-                }
+                val scale by animateFloatAsState(
+                    targetValue = targetScale,
+                    animationSpec = spring(
+                        dampingRatio = 0.8f,
+                        stiffness = 300f
+                    ),
+                    label = "cardScale$index"
+                )
                 
-                key(card.id) {
-                    SwipeableCard(
-                        state = swipeState,
-                        modifier = Modifier.graphicsLayer {
-                            translationY = offset
-                        }
-                    ) {
-                        JobSwipeCard(
-                            jobCard = card,
-                            swipeProgress = swipeState.swipeProgress,
-                            swipeDirection = swipeState.detectedDirection,
-                            onClick = { onCardClicked(card) }
-                        )
-                    }
-                }
-            } else {
-                // Background cards (interactive but not swipeable)
+                val offset by animateFloatAsState(
+                    targetValue = targetOffset,
+                    animationSpec = spring(
+                        dampingRatio = 0.8f,
+                        stiffness = 300f
+                    ),
+                    label = "cardOffset$index"
+                )
+                
                 key(card.id) {
                     Box(
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationY = offset
-                        }
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationY = offset
+                            }
                     ) {
                         JobSwipeCard(
                             jobCard = card,
@@ -109,6 +86,30 @@ fun SwipeCardStack(
                             onClick = { onCardClicked(card) }
                         )
                     }
+                }
+            }
+        }
+        if (visibleCards.isNotEmpty()) {
+            val topCard = visibleCards.first()
+
+            val swipeState = rememberSwipeCardState(
+                key = topCard.id, 
+                onSwipe = { direction ->
+                    onCardSwiped(topCard, direction)
+                }
+            )
+
+            key(topCard.id) {
+                SwipeableCard(
+                    state = swipeState,
+                    modifier = Modifier
+                ) {
+                    JobSwipeCard(
+                        jobCard = topCard,
+                        swipeProgress = swipeState.swipeProgress,
+                        swipeDirection = swipeState.detectedDirection,
+                        onClick = { onCardClicked(topCard) }
+                    )
                 }
             }
         }

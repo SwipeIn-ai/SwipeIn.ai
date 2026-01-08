@@ -1,6 +1,7 @@
 package com.swipeapply.app.ui.screens
 
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTapGestures
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
+import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
 import com.swipeapply.app.ui.theme.*
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
@@ -51,7 +55,9 @@ fun HomeScreen(
     onCardClicked: (JobCard) -> Unit,
     onRequestIntro: (JobCard) -> Unit,
     viewModel: HomeViewModel = viewModel(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDarkModeToggle: (Boolean?) -> Unit = {},
+    isDarkModeEnabled: Boolean? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current
@@ -63,7 +69,7 @@ fun HomeScreen(
     
     // Undo history dialog state
     var showUndoDialog by remember { mutableStateOf(false) }
-    
+
     LaunchedEffect(uiState.showBottomSheet) {
         if (uiState.showBottomSheet) {
             sheetState.show()
@@ -75,7 +81,7 @@ fun HomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(MaterialTheme.colorScheme.background) // Fix: Use Theme color, not hardcoded Light
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -91,7 +97,9 @@ fun HomeScreen(
                     if (uiState.undoHistory.isNotEmpty()) {
                         showUndoDialog = true
                     }
-                }
+                },
+                isDarkMode = isDarkModeEnabled, 
+                onDarkModeToggle = onDarkModeToggle
             )
             
             // Card stack area
@@ -101,7 +109,7 @@ fun HomeScreen(
             ) {
                 when {
                     uiState.isLoading -> {
-                        LoadingState()
+                        ShimmerCardStack()
                     }
                     uiState.isEmpty -> {
                         EmptyState(
@@ -189,7 +197,9 @@ fun HomeScreen(
 private fun HomeTopBar(
     stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
     onUndo: () -> Unit,
-    onUndoLongPress: () -> Unit
+    onUndoLongPress: () -> Unit,
+    isDarkMode: Boolean? = null,
+    onDarkModeToggle: (Boolean?) -> Unit = {}
 ) {
     Surface(
         color = BackgroundLight,
@@ -265,6 +275,26 @@ private fun HomeTopBar(
                             }
                         }
                     }
+                }
+                
+                // Dark mode toggle button
+                IconButton(onClick = {
+                    val newMode = when (isDarkMode) {
+                        null -> true // System -> Dark
+                        true -> false // Dark -> Light
+                        false -> null // Light -> System
+                    }
+                    onDarkModeToggle(newMode)
+                }) {
+                    Icon(
+                        imageVector = when (isDarkMode) {
+                            true -> Icons.Default.LightMode
+                            false -> Icons.Default.DarkMode
+                            null -> Icons.Default.DarkMode
+                        },
+                        contentDescription = "Toggle dark mode",
+                        tint = TextSecondary
+                    )
                 }
             }
         }
@@ -565,22 +595,31 @@ private fun CompanyDetailSheet(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // CTA Button
-        Button(
-            onClick = onRequestIntro,
+        // CTA Button with gradient
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Primary
-            )
+                .height(56.dp)
+                .background(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(GradientStart, GradientEnd)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clip(RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Request intro template",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            TextButton(
+                onClick = onRequestIntro,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Text(
+                    text = "Request intro template",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
         }
     }
 }

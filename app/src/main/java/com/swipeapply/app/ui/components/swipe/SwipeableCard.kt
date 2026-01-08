@@ -66,7 +66,7 @@ fun SwipeableCard(
                 scaleX = dragScale
                 scaleY = dragScale
             }
-            .pointerInput(Unit) {
+            .pointerInput(state) {
                 var velocity = Offset.Zero
                 
                 detectDragGestures(

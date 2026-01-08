@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -143,48 +144,53 @@ private fun LinkedInButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = LinkedInBlue
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 2.dp
-        )
+    Box(
+        modifier = modifier
+            .height(56.dp)
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    colors = listOf(LinkedInBlue, LinkedInBlue.copy(alpha = 0.85f))
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clip(RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxSize()
         ) {
-            // LinkedIn icon placeholder
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(
-                        color = Color.White,
-                        shape = RoundedCornerShape(4.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
+                // LinkedIn icon placeholder
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            color = Color.White,
+                            shape = RoundedCornerShape(4.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "in",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = LinkedInBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
                 Text(
-                    text = "in",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LinkedInBlue,
-                    fontWeight = FontWeight.Bold
+                    text = "Continue with LinkedIn",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Text(
-                text = "Continue with LinkedIn",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold
-            )
         }
     }
 }
