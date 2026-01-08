@@ -8,8 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,17 +18,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.TechStackIcons
-import com.swipeapply.app.ui.theme.*
+import com.swipeapply.app.ui.theme.* // We still need this for Gradient constants
 
-/**
- * Visual job card for the swipe experience.
- * Shows company info, job details, and swipe feedback overlays.
- */
 @Composable
 fun JobSwipeCard(
     jobCard: JobCard,
@@ -39,17 +32,21 @@ fun JobSwipeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Animate border color based on swipe direction
+    // Determine dynamic colors for swipe feedback
+    // We use the Theme's Error (Red) and Tertiary (Green) colors so they adapt
+    val rightSwipeColor = MaterialTheme.colorScheme.tertiary 
+    val leftSwipeColor = MaterialTheme.colorScheme.error
+
     val borderColor by animateColorAsState(
         targetValue = when (swipeDirection) {
-            SwipeDirection.RIGHT -> AccentGreen.copy(alpha = swipeProgress)
-            SwipeDirection.LEFT -> AccentRed.copy(alpha = swipeProgress)
+            SwipeDirection.RIGHT -> rightSwipeColor.copy(alpha = swipeProgress)
+            SwipeDirection.LEFT -> leftSwipeColor.copy(alpha = swipeProgress)
             SwipeDirection.NONE -> Color.Transparent
         },
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
         label = "borderColor"
     )
-    
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -57,7 +54,8 @@ fun JobSwipeCard(
             .shadow(
                 elevation = 8.dp,
                 shape = RoundedCornerShape(20.dp),
-                spotColor = CardShadow
+                // Fix: Use a darker shadow in dark mode (if mapped in Theme), or fallback to black
+                spotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
             )
             .clip(RoundedCornerShape(20.dp))
             .border(
@@ -68,7 +66,8 @@ fun JobSwipeCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = BackgroundCard
+            // FIX: Use the Theme's Surface color (White in Light Mode, Dark Grey in Dark Mode)
+            containerColor = MaterialTheme.colorScheme.surface 
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -80,36 +79,36 @@ fun JobSwipeCard(
             ) {
                 // Top section - Company info
                 Column {
-                    // Hiring badge
                     if (jobCard.isHiringNow) {
                         HiringBadge()
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
-                    // Company logo placeholder
+
                     CompanyLogo(companyName = jobCard.company.name)
-                    
+
                     Spacer(modifier = Modifier.height(20.dp))
-                    
+
                     // Company name
                     Text(
                         text = jobCard.company.name,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimary,
+                        // FIX: Use OnSurface (Black in Light, White in Dark)
+                        color = MaterialTheme.colorScheme.onSurface, 
                         fontWeight = FontWeight.Bold
                     )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     // Job title
                     Text(
                         text = jobCard.title,
                         style = MaterialTheme.typography.titleLarge,
-                        color = TextSecondary
+                        // FIX: Use OnSurfaceVariant (Grey in both, but readable)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant 
                     )
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     // Location
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -120,34 +119,34 @@ fun JobSwipeCard(
                             locationType = jobCard.locationType.label
                         )
                     }
-                    
-                    // Salary (if available)
+
+                    // Salary
                     jobCard.salary?.let { salary ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = salary.formatted(),
                             style = MaterialTheme.typography.titleMedium,
-                            color = ChipTextAccent,
+                            // FIX: Use Primary or Secondary color for emphasis
+                            color = MaterialTheme.colorScheme.primary, 
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
-                
+
                 // Bottom section - Tech stack
                 Column {
                     Text(
                         text = "Tech Stack",
                         style = MaterialTheme.typography.labelMedium,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     TechStackChips(techStack = jobCard.techStack)
                 }
             }
-            
-            // Swipe feedback overlays
+
             SwipeOverlay(
                 direction = swipeDirection,
                 progress = swipeProgress
@@ -158,9 +157,11 @@ fun JobSwipeCard(
 
 @Composable
 private fun HiringBadge() {
+    // Badge colors are specific, so we can keep using custom colors if they look good in both,
+    // or map them to Theme Custom colors. For now, we manually adjust for dark mode safety.
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = BadgeHiringBackground
+        color = BadgeHiringBackground // You might want to create BadgeHiringBackgroundDark in your Color.kt
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -175,7 +176,7 @@ private fun HiringBadge() {
             Text(
                 text = "Hiring now",
                 style = MaterialTheme.typography.labelMedium,
-                color = BadgeHiring,
+                color = BadgeHiring, // Ensure this contrasts well
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -184,18 +185,18 @@ private fun HiringBadge() {
 
 @Composable
 private fun CompanyLogo(companyName: String) {
-    // Generate initials from company name
     val initials = companyName.split(" ")
         .take(2)
         .mapNotNull { it.firstOrNull()?.uppercase() }
         .joinToString("")
-    
+
     Box(
         modifier = Modifier
             .size(72.dp)
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(GradientStart, GradientEnd)
+                    // Gradient usually looks good in both modes, but you can create GradientStartDark if needed
+                    colors = listOf(GradientStart, GradientEnd) 
                 ),
                 shape = RoundedCornerShape(16.dp)
             ),
@@ -204,7 +205,7 @@ private fun CompanyLogo(companyName: String) {
         Text(
             text = initials,
             style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
+            color = Color.White, // Always white on top of a colored gradient
             fontWeight = FontWeight.Bold
         )
     }
@@ -219,26 +220,32 @@ private fun LocationChip(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Location Chip
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = ChipBackground
+            // FIX: Use SurfaceVariant (Light Grey in Light, Dark Grey in Dark)
+            color = MaterialTheme.colorScheme.surfaceVariant 
         ) {
             Text(
                 text = location,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                // FIX: Use OnSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
             )
         }
-        
+
+        // Location Type Chip (Remote/Onsite)
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = ChipBackgroundAccent
+            // FIX: Use Secondary Container
+            color = MaterialTheme.colorScheme.secondaryContainer 
         ) {
             Text(
                 text = locationType,
                 style = MaterialTheme.typography.bodyMedium,
-                color = ChipTextAccent,
+                // FIX: Use OnSecondaryContainer
+                color = MaterialTheme.colorScheme.onSecondaryContainer, 
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
             )
@@ -248,7 +255,6 @@ private fun LocationChip(
 
 @Composable
 private fun TechStackChips(techStack: List<String>) {
-    // Use FlowRow-like layout with wrapping
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val chunkedStack = techStack.chunked(2)
         chunkedStack.forEach { rowItems ->
@@ -259,7 +265,8 @@ private fun TechStackChips(techStack: List<String>) {
                     val techIcon = TechStackIcons.getIcon(tech)
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = BackgroundSecondary
+                        // FIX: Use SurfaceVariant for the chip background
+                        color = MaterialTheme.colorScheme.surfaceVariant 
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -269,13 +276,14 @@ private fun TechStackChips(techStack: List<String>) {
                             Icon(
                                 imageVector = techIcon.icon,
                                 contentDescription = null,
-                                tint = techIcon.color,
+                                tint = techIcon.color, // Icons usually keep their brand color
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = tech,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = TextPrimary,
+                                // FIX: Use OnSurface (White in dark mode)
+                                color = MaterialTheme.colorScheme.onSurface, 
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -304,36 +312,39 @@ private fun SwipeOverlay(
         ) {
             when (direction) {
                 SwipeDirection.RIGHT -> {
+                    // Interested Overlay
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = AccentGreenLight.copy(alpha = progress),
+                        // FIX: Use Tertiary Container (Green-ish in both modes)
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = progress),
                         border = androidx.compose.foundation.BorderStroke(
                             width = 2.dp,
-                            color = AccentGreen.copy(alpha = progress)
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = progress)
                         )
                     ) {
                         Text(
                             text = "INTERESTED",
                             style = MaterialTheme.typography.titleMedium,
-                            color = AccentGreen.copy(alpha = progress),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = progress),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
                 }
                 SwipeDirection.LEFT -> {
+                    // Skip Overlay
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = AccentRedLight.copy(alpha = progress),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = progress),
                         border = androidx.compose.foundation.BorderStroke(
                             width = 2.dp,
-                            color = AccentRed.copy(alpha = progress)
+                            color = MaterialTheme.colorScheme.error.copy(alpha = progress)
                         )
                     ) {
                         Text(
                             text = "SKIP",
                             style = MaterialTheme.typography.titleMedium,
-                            color = AccentRed.copy(alpha = progress),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = progress),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
