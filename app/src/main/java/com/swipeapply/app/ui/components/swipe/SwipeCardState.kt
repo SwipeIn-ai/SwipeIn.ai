@@ -145,16 +145,16 @@ class SwipeCardState(
 
 @Composable
 fun rememberSwipeCardState(
+    key: Any?, 
     onSwipe: (SwipeDirection) -> Unit = {}
 ): SwipeCardState {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    
+
     val screenWidth = with(density) {
         configuration.screenWidthDp.dp.toPx()
     }
-    
-    return remember(screenWidth) {
+    return remember(key, screenWidth) {
         SwipeCardState(
             screenWidth = screenWidth,
             onSwipe = onSwipe

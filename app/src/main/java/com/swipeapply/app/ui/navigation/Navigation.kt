@@ -33,7 +33,9 @@ sealed class Screen(val route: String) {
 @Composable
 fun SwipeApplyNavHost(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Onboarding.route
+    startDestination: String = Screen.Onboarding.route,
+    onDarkModeToggle: (Boolean?) -> Unit = {},
+    isDarkModeEnabled: Boolean? = null
 ) {
     NavHost(
         navController = navController,
@@ -84,7 +86,9 @@ fun SwipeApplyNavHost(
                 onCardClicked = { /* Handled by bottom sheet */ },
                 onRequestIntro = { jobCard ->
                     navController.navigate(Screen.IntroTemplate.createRoute(jobCard.id))
-                }
+                },
+                onDarkModeToggle = onDarkModeToggle,
+                isDarkModeEnabled = isDarkModeEnabled
             )
         }
         
