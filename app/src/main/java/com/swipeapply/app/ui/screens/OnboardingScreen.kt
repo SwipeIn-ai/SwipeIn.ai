@@ -26,6 +26,13 @@ fun OnboardingScreen(
     onContinueWithLinkedIn: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showDebugScreen by remember { mutableStateOf(false) }
+    
+    if (showDebugScreen) {
+        DebugScreen(onBack = { showDebugScreen = false })
+        return
+    }
+    
     // Subtle fade-in animation
     val animatedAlpha = remember { Animatable(0f) }
     
@@ -97,6 +104,17 @@ fun OnboardingScreen(
             )
             
             Spacer(modifier = Modifier.height(48.dp))
+            
+            // Debug button (tap to test API)
+            TextButton(
+                onClick = { showDebugScreen = true }
+            ) {
+                Text(
+                    "🧪 Test API",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary
+                )
+            }
         }
     }
 }

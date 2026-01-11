@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,13 +55,32 @@ import com.swipeapply.app.ui.viewmodel.UndoableAction
 fun HomeScreen(
     onCardClicked: (JobCard) -> Unit,
     onRequestIntro: (JobCard) -> Unit,
-    viewModel: HomeViewModel = viewModel(),
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null
 ) {
+    val context = LocalContext.current
+    val viewModel: HomeViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return HomeViewModel(context.applicationContext as android.app.Application) as T
+            }
+        }
+    )
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    // Show error snackbar
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(
+                message = error,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
     
     // Bottom sheet state
     val sheetState = rememberModalBottomSheetState(
@@ -111,29 +131,80 @@ fun HomeScreen(
                     uiState.isLoading -> {
                         ShimmerCardStack()
                     }
-                    uiState.isEmpty -> {
+                    uiState.error != null -> {
+                        ErrorState(
+                            error = uiState.error!!,
+                            onRetry = { viewModel.refreshCards() }
+                        )
+                    }
+                    // Truly empty - no cards AND no more pages to load
+                    uiState.isEmpty && !uiState.hasMorePages && !uiState.isLoadingMore -> {
                         EmptyState(
                             interestedCount = uiState.interestedCards.size,
                             onReset = { viewModel.resetCards() }
                         )
                     }
-                    else -> {
-                        SwipeCardStack(
-                            cards = uiState.cards,
-                            onCardSwiped = { card, direction ->
-                                viewModel.onCardSwiped(card, direction)
-                            },
-                            onCardClicked = { card ->
-                                viewModel.selectCard(card)
+                    // Cards are empty but more are coming
+                    uiState.cards.isEmpty() && (uiState.hasMorePages || uiState.isLoadingMore) -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = GradientStart,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading more jobs...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                    // Normal state - show cards
+                    uiState.cards.isNotEmpty() -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Jobs counter
+                            if (uiState.totalJobs > 0) {
+                                Text(
+                                    text = "${uiState.cards.size} remaining of ${uiState.totalJobs} jobs",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextTertiary,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
                             }
-                        )
+                            
+                            SwipeCardStack(
+                                cards = uiState.cards,
+                                onCardSwiped = { card, direction ->
+                                    viewModel.onCardSwiped(card, direction)
+                                },
+                                onCardClicked = { card ->
+                                    viewModel.selectCard(card)
+                                }
+                            )
+                            
+                            // Loading more indicator
+                            if (uiState.isLoadingMore) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.5f)
+                                        .height(2.dp),
+                                    color = GradientStart
+                                )
+                            }
+                        }
                     }
                 }
             }
             
             // Bottom action buttons
             AnimatedVisibility(
-                visible = !uiState.isEmpty && !uiState.isLoading,
+                visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
@@ -190,6 +261,14 @@ fun HomeScreen(
                 }
             )
         }
+        
+        // Snackbar for errors
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
 
@@ -773,6 +852,87 @@ private fun UndoHistoryItem(action: UndoableAction) {
 }
 
 // Extension for graphicsLayer on Text
+@Composable
+private fun ErrorState(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        // Error icon
+        Text(
+            text = "⚠️",
+            style = MaterialTheme.typography.displayLarge,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        Text(
+            text = "Oops! Something went wrong",
+            style = MaterialTheme.typography.headlineMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Error message
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = AccentRedLight,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AccentRed,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Retry button
+        Button(
+            onClick = onRetry,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Primary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Try Again",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Text(
+            text = "Check your internet connection and try again",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextTertiary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
 @Composable
 private fun Modifier.graphicsLayer(block: androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit): Modifier {
     return this.then(
