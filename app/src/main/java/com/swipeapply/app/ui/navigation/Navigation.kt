@@ -72,14 +72,14 @@ fun SwipeApplyNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) }
         ) {
             OnboardingScreen(
-                onContinueWithLinkedIn = {
+                onContinue = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
             )
         }
-        
+
         // Home / Swipe screen
         composable(route = Screen.Home.route) {
             HomeScreen(
@@ -88,11 +88,20 @@ fun SwipeApplyNavHost(
                     navController.navigate(Screen.IntroTemplate.createRoute(jobCard.id))
                 },
                 onDarkModeToggle = onDarkModeToggle,
-                isDarkModeEnabled = isDarkModeEnabled
+                isDarkModeEnabled = isDarkModeEnabled,
+                // NEW: Handle sign out navigation
+                onSignOutSuccess = {
+    navController.navigate(Screen.Onboarding.route) {
+        // Clear everything – very aggressive
+        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+        // Alternative (even stronger): popUpTo(0) { inclusive = true }
+        launchSingleTop = true
+        restoreState = false          // ← Prevents restoring any old state
+    }
+}
+                
             )
         }
-        
-        // Intro template screen
         composable(
             route = Screen.IntroTemplate.route,
             arguments = listOf(
@@ -101,7 +110,7 @@ fun SwipeApplyNavHost(
         ) { backStackEntry ->
             val jobId = backStackEntry.arguments?.getString("jobId") ?: return@composable
             val jobCard = MockJobRepository.getJobCardById(jobId) ?: return@composable
-            
+
             IntroTemplateScreen(
                 jobCard = jobCard,
                 onBack = { navController.popBackStack() }

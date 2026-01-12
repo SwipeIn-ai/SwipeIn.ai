@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.ExitToApp // NEW Import
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +45,14 @@ import com.swipeapply.app.ui.components.swipe.SwipeCardStack
 import com.swipeapply.app.ui.theme.*
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
 import com.swipeapply.app.ui.viewmodel.UndoableAction
+// NEW Imports for Auth
+import com.swipeapply.app.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.SignOutScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * Main home screen with card stack and swipe actions.
@@ -57,10 +66,15 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
-    isDarkModeEnabled: Boolean? = null
+    isDarkModeEnabled: Boolean? = null,
+    onSignOutSuccess: () -> Unit // NEW Parameter
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current
+    
+    // NEW: Scope for Sign Out coroutine
+    val scope = rememberCoroutineScope()
+    val supabase = SupabaseClient.client
     
     // Bottom sheet state
     val sheetState = rememberModalBottomSheetState(
@@ -81,7 +95,7 @@ fun HomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background) // Fix: Use Theme color, not hardcoded Light
+            .background(MaterialTheme.colorScheme.background) 
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -99,7 +113,21 @@ fun HomeScreen(
                     }
                 },
                 isDarkMode = isDarkModeEnabled, 
-                onDarkModeToggle = onDarkModeToggle
+                onDarkModeToggle = onDarkModeToggle,
+onSignOut = {
+    scope.launch {
+        try {
+            // 1. Explicitly sign out locally
+            supabase.auth.signOut(scope = SignOutScope.LOCAL)
+            delay(250L)
+        } catch (e: Exception) {
+            // Optional: log or show error
+        } finally {
+            // 3. Navigate only after delay
+            onSignOutSuccess()
+        }
+    }
+}
             )
             
             // Card stack area
@@ -199,7 +227,8 @@ private fun HomeTopBar(
     onUndo: () -> Unit,
     onUndoLongPress: () -> Unit,
     isDarkMode: Boolean? = null,
-    onDarkModeToggle: (Boolean?) -> Unit = {}
+    onDarkModeToggle: (Boolean?) -> Unit = {},
+    onSignOut: () -> Unit // NEW Parameter
 ) {
     Surface(
         color = BackgroundLight,
@@ -221,7 +250,7 @@ private fun HomeTopBar(
                 fontWeight = FontWeight.Bold
             )
             
-            // Stats and undo
+            // Stats and actions
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -237,21 +266,20 @@ private fun HomeTopBar(
                 // Undo button with count badge
                 Box {
                     IconButton(
-    onClick = onUndo,
-    modifier = Modifier.pointerInput(Unit) {
-        detectTapGestures(
-            onLongPress = { onUndoLongPress() }
-        )
-    }
-) {
-    Icon(
-        imageVector = Icons.Default.Refresh,
-        contentDescription = "Undo (long press for history)",
-        tint = if (stats.undoCount > 0) Primary else TextSecondary
-    )
-}
+                        onClick = onUndo,
+                        modifier = Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = { onUndoLongPress() }
+                            )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Undo (long press for history)",
+                            tint = if (stats.undoCount > 0) Primary else TextSecondary
+                        )
+                    }
 
-                    
                     // Undo count badge
                     if (stats.undoCount > 0) {
                         Surface(
@@ -294,6 +322,14 @@ private fun HomeTopBar(
                         },
                         contentDescription = "Toggle dark mode",
                         tint = TextSecondary
+                    )
+                }
+                
+                IconButton(onClick = onSignOut) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Sign Out",
+                        tint = AccentRed // Using Red to indicate exit/destructive action
                     )
                 }
             }
