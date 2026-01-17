@@ -15,32 +15,58 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+// Imports from your version (Supabase)
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.ui.theme.*
 import io.github.jan.supabase.auth.auth
-// FIX: Import OAuthProvider
 import io.github.jan.supabase.auth.providers.OAuthProvider
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-// FIX: Change AuthProvider -> OAuthProvider
+// Custom OIDC Provider Object (Your fix)
 object LinkedInOidc : OAuthProvider() {
     override val name = "linkedin_oidc"
 }
 
+/**
+ * Onboarding screen - first screen users see.
+ * Minimal, professional, with LinkedIn/Google CTA and Debug option.
+ */
 @Composable
 fun OnboardingScreen(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // --- State & Supabase Setup (Your Version) ---
     val supabase = SupabaseClient.client
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Auto-login loop prevention
     var isJustLoggedOut by remember { mutableStateOf(false) }
 
+    // --- State for Debug Screen (Contributor's Version) ---
+    var showDebugScreen by remember { mutableStateOf(false) }
+
+    // Check if we should show the debug screen overlay
+    if (showDebugScreen) {
+        // Assuming DebugScreen is defined elsewhere in your project
+        // If not, you might need to import it or comment this out until merged
+        // DebugScreen(onBack = { showDebugScreen = false }) 
+        
+        // Placeholder in case the file isn't imported yet:
+         Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
+             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                 Text("Debug Screen Placeholder")
+                 Button(onClick = { showDebugScreen = false }) { Text("Back") }
+             }
+         }
+         return
+    }
+
+    // --- Auth Listener (Your Version) ---
     LaunchedEffect(Unit) {
         supabase.auth.sessionStatus.collectLatest { status ->
             when (status) {
@@ -56,6 +82,7 @@ fun OnboardingScreen(
         }
     }
 
+    // --- Animation ---
     val animatedAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
@@ -65,6 +92,7 @@ fun OnboardingScreen(
         )
     }
 
+    // --- UI Content ---
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.fillMaxSize()
@@ -108,6 +136,7 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
+                // --- Google Button (Your Version) ---
                 GoogleButton(
                     onClick = {
                         scope.launch {
@@ -126,13 +155,14 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Using our custom LinkedInOidc object
+                // --- LinkedIn Button (Combined) ---
+                // Uses your OIDC logic + UI style
                 LinkedInButton(
                     onClick = {
                         scope.launch {
                             try {
                                 supabase.auth.signInWith(
-                                    provider = LinkedInOidc,
+                                    provider = LinkedInOidc, // Custom Object
                                     redirectUrl = "swipeapply://callback"
                                 )
                             } catch (e: Exception) {
@@ -153,6 +183,17 @@ fun OnboardingScreen(
                 )
 
                 Spacer(modifier = Modifier.height(48.dp))
+
+                // --- Test API Button (Contributor's Version) ---
+                TextButton(
+                    onClick = { showDebugScreen = true }
+                ) {
+                    Text(
+                        "🧪 Test API",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextTertiary
+                    )
+                }
             }
         }
     }

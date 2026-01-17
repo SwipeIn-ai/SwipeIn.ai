@@ -1,8 +1,5 @@
 package com.swipeapply.app.ui.screens
 
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.gestures.detectTapGestures
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -12,7 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,24 +17,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.ExitToApp // NEW Import
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.ShimmerCardStack
@@ -45,14 +46,10 @@ import com.swipeapply.app.ui.components.swipe.SwipeCardStack
 import com.swipeapply.app.ui.theme.*
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
 import com.swipeapply.app.ui.viewmodel.UndoableAction
-// NEW Imports for Auth
-import com.swipeapply.app.SupabaseClient
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.SignOutScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /**
  * Main home screen with card stack and swipe actions.
@@ -63,24 +60,48 @@ import kotlinx.coroutines.withContext
 fun HomeScreen(
     onCardClicked: (JobCard) -> Unit,
     onRequestIntro: (JobCard) -> Unit,
-    viewModel: HomeViewModel = viewModel(),
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null,
-    onSignOutSuccess: () -> Unit // NEW Parameter
+    onSignOutSuccess: () -> Unit // From Auth changes
 ) {
+    // --- 1. ViewModel Setup (From Job API changes) ---
+    // We use a factory to pass the Application context to the ViewModel for API/Repo access
+    val context = LocalContext.current
+    val viewModel: HomeViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return HomeViewModel(context.applicationContext as android.app.Application) as T
+            }
+        }
+    )
+
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current
-    
-    // NEW: Scope for Sign Out coroutine
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // --- 2. Auth Setup (From Auth changes) ---
     val scope = rememberCoroutineScope()
     val supabase = SupabaseClient.client
+
+    // --- 3. Effects ---
     
+    // Show error snackbar (From Job API)
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(
+                message = error,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
+
     // Bottom sheet state
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
     )
-    
+
     // Undo history dialog state
     var showUndoDialog by remember { mutableStateOf(false) }
 
@@ -91,11 +112,11 @@ fun HomeScreen(
             sheetState.hide()
         }
     }
-    
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background) 
+            .background(MaterialTheme.colorScheme.background) // Use Theme color (From Job API)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -112,56 +133,110 @@ fun HomeScreen(
                         showUndoDialog = true
                     }
                 },
-                isDarkMode = isDarkModeEnabled, 
+                isDarkMode = isDarkModeEnabled,
                 onDarkModeToggle = onDarkModeToggle,
-onSignOut = {
-    scope.launch {
-        try {
-            // 1. Explicitly sign out locally
-            supabase.auth.signOut(scope = SignOutScope.LOCAL)
-            delay(250L)
-        } catch (e: Exception) {
-            // Optional: log or show error
-        } finally {
-            // 3. Navigate only after delay
-            onSignOutSuccess()
-        }
-    }
-}
+                // Sign Out Logic (From Auth Changes)
+                onSignOut = {
+                    scope.launch {
+                        try {
+                            // Explicitly sign out locally
+                            supabase.auth.signOut(scope = SignOutScope.LOCAL)
+                            delay(250L)
+                        } catch (e: Exception) {
+                            // Optional: log or show error
+                        } finally {
+                            // Navigate only after delay
+                            onSignOutSuccess()
+                        }
+                    }
+                }
             )
-            
-            // Card stack area
+
+            // Card stack area (Combined Logic)
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 when {
+                    // Initial Loading
                     uiState.isLoading -> {
                         ShimmerCardStack()
                     }
-                    uiState.isEmpty -> {
+                    // Error State (From Job API)
+                    uiState.error != null -> {
+                        ErrorState(
+                            error = uiState.error!!,
+                            onRetry = { viewModel.refreshCards() }
+                        )
+                    }
+                    // Truly empty - no cards AND no more pages to load (From Job API)
+                    uiState.isEmpty && !uiState.hasMorePages && !uiState.isLoadingMore -> {
                         EmptyState(
                             interestedCount = uiState.interestedCards.size,
                             onReset = { viewModel.resetCards() }
                         )
                     }
-                    else -> {
-                        SwipeCardStack(
-                            cards = uiState.cards,
-                            onCardSwiped = { card, direction ->
-                                viewModel.onCardSwiped(card, direction)
-                            },
-                            onCardClicked = { card ->
-                                viewModel.selectCard(card)
+                    // Cards are empty but more are coming (Pagination Loading)
+                    uiState.cards.isEmpty() && (uiState.hasMorePages || uiState.isLoadingMore) -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = GradientStart,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading more jobs...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                    // Normal state - show cards
+                    uiState.cards.isNotEmpty() -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Jobs counter (From Job API)
+                            if (uiState.totalJobs > 0) {
+                                Text(
+                                    text = "${uiState.cards.size} remaining of ${uiState.totalJobs} jobs",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextTertiary,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
                             }
-                        )
+
+                            SwipeCardStack(
+                                cards = uiState.cards,
+                                onCardSwiped = { card, direction ->
+                                    viewModel.onCardSwiped(card, direction)
+                                },
+                                onCardClicked = { card ->
+                                    viewModel.selectCard(card)
+                                }
+                            )
+
+                            // Loading more indicator (small bar at bottom)
+                            if (uiState.isLoadingMore) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.5f)
+                                        .height(2.dp),
+                                    color = GradientStart
+                                )
+                            }
+                        }
                     }
                 }
             }
-            
+
             // Bottom action buttons
             AnimatedVisibility(
-                visible = !uiState.isEmpty && !uiState.isLoading,
+                visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
@@ -181,7 +256,7 @@ onSignOut = {
                 )
             }
         }
-        
+
         // Company detail bottom sheet
         if (uiState.showBottomSheet && uiState.selectedCard != null) {
             ModalBottomSheet(
@@ -201,7 +276,7 @@ onSignOut = {
                 )
             }
         }
-        
+
         // Undo history dialog
         if (showUndoDialog) {
             UndoHistoryDialog(
@@ -218,6 +293,14 @@ onSignOut = {
                 }
             )
         }
+
+        // Snackbar for errors (From Job API)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
     }
 }
 
@@ -228,7 +311,7 @@ private fun HomeTopBar(
     onUndoLongPress: () -> Unit,
     isDarkMode: Boolean? = null,
     onDarkModeToggle: (Boolean?) -> Unit = {},
-    onSignOut: () -> Unit // NEW Parameter
+    onSignOut: () -> Unit // Added from Auth changes
 ) {
     Surface(
         color = BackgroundLight,
@@ -249,7 +332,7 @@ private fun HomeTopBar(
                 color = TextPrimary,
                 fontWeight = FontWeight.Bold
             )
-            
+
             // Stats and actions
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -262,7 +345,7 @@ private fun HomeTopBar(
                         color = AccentGreen
                     )
                 }
-                
+
                 // Undo button with count badge
                 Box {
                     IconButton(
@@ -304,7 +387,7 @@ private fun HomeTopBar(
                         }
                     }
                 }
-                
+
                 // Dark mode toggle button
                 IconButton(onClick = {
                     val newMode = when (isDarkMode) {
@@ -324,12 +407,13 @@ private fun HomeTopBar(
                         tint = TextSecondary
                     )
                 }
-                
+
+                // Sign Out Button (From Auth changes)
                 IconButton(onClick = onSignOut) {
                     Icon(
                         imageVector = Icons.Default.ExitToApp,
                         contentDescription = "Sign Out",
-                        tint = AccentRed // Using Red to indicate exit/destructive action
+                        tint = AccentRed
                     )
                 }
             }
@@ -337,6 +421,7 @@ private fun HomeTopBar(
     }
 }
 
+// --- Helper Composables ---
 
 @Composable
 private fun StatBadge(
@@ -368,12 +453,86 @@ private fun StatBadge(
     }
 }
 
+// Added ErrorState Composable (From Job API changes)
 @Composable
-private fun LoadingState() {
-    CircularProgressIndicator(
-        color = GradientStart,
-        strokeWidth = 3.dp
-    )
+private fun ErrorState(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        // Error icon
+        Text(
+            text = "⚠️",
+            style = MaterialTheme.typography.displayLarge,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        Text(
+            text = "Oops! Something went wrong",
+            style = MaterialTheme.typography.headlineMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Error message
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = AccentRedLight,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AccentRed,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Retry button
+        Button(
+            onClick = onRetry,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Primary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Try Again",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Check your internet connection and try again",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextTertiary,
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable
@@ -397,18 +556,18 @@ private fun EmptyState(
             ),
             label = "scale"
         )
-        
+
         Text(
             text = "🎉",
             style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.graphicsLayer { 
+            modifier = Modifier.graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "You're all caught up!",
             style = MaterialTheme.typography.headlineMedium,
@@ -416,9 +575,9 @@ private fun EmptyState(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         Text(
             text = if (interestedCount > 0) {
                 "You're interested in $interestedCount ${if (interestedCount == 1) "role" else "roles"}.\nTime to send some intros!"
@@ -429,9 +588,9 @@ private fun EmptyState(
             color = TextSecondary,
             textAlign = TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         // Reset button
         OutlinedButton(
             onClick = onReset,
@@ -470,7 +629,7 @@ private fun ActionButtons(
             contentColor = AccentRed,
             onClick = onSkip
         )
-        
+
         // Interested button
         ActionButton(
             icon = Icons.Default.Favorite,
@@ -494,7 +653,7 @@ private fun ActionButton(
 ) {
     val size = if (isLarge) 72.dp else 60.dp
     val iconSize = if (isLarge) 32.dp else 24.dp
-    
+
     FilledIconButton(
         onClick = onClick,
         modifier = Modifier
@@ -551,7 +710,7 @@ private fun CompanyDetailSheet(
                     )
                 }
             }
-            
+
             Column {
                 Text(
                     text = jobCard.company.name,
@@ -566,9 +725,9 @@ private fun CompanyDetailSheet(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         // Company description
         Text(
             text = "About the company",
@@ -581,9 +740,9 @@ private fun CompanyDetailSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         // Role details
         Text(
             text = "The role",
@@ -603,9 +762,9 @@ private fun CompanyDetailSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         // Why it matches
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -628,9 +787,9 @@ private fun CompanyDetailSheet(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         // CTA Button with gradient
         Box(
             modifier = Modifier
@@ -686,9 +845,9 @@ private fun UndoHistoryDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // History list
                 LazyColumn(
                     modifier = Modifier
@@ -715,7 +874,7 @@ private fun UndoHistoryDialog(
                 ) {
                     Text("Undo All")
                 }
-                
+
                 // Undo last 5
                 if (undoHistory.size >= 5) {
                     TextButton(
@@ -741,7 +900,7 @@ private fun UndoHistoryDialog(
                 ) {
                     Text("Clear")
                 }
-                
+
                 TextButton(onClick = onDismiss) {
                     Text("Close")
                 }
@@ -779,7 +938,7 @@ private fun UndoHistoryItem(action: UndoableAction) {
                     color = TextSecondary
                 )
             }
-            
+
             // Direction badge
             Surface(
                 shape = RoundedCornerShape(8.dp),

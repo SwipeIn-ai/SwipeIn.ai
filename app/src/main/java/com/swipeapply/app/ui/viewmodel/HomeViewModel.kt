@@ -1,16 +1,21 @@
 package com.swipeapply.app.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.data.model.SwipeResult
-import com.swipeapply.app.data.repository.MockJobRepository
+import com.swipeapply.app.data.repository.JobRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private const val TAG = "HomeViewModel"
 
 /**
  * Represents a single undo-able action
@@ -31,16 +36,25 @@ data class HomeUiState(
     val selectedCard: JobCard? = null,
     val showBottomSheet: Boolean = false,
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
     val isEmpty: Boolean = false,
     val undoHistory: List<UndoableAction> = emptyList(),
-    val canUndo: Boolean = false
+    val canUndo: Boolean = false,
+    val error: String? = null,
+    val hasMorePages: Boolean = true,
+    val totalJobs: Int = 0
 )
 
 /**
  * ViewModel for the Home/Swipe screen.
  * Manages card stack state and swipe actions.
  */
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = JobRepository.getInstance(
+        context = application.applicationContext,
+        apiKey = ApiConfig.FINDWORK_API_KEY
+    )
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -56,19 +70,152 @@ class HomeViewModel : ViewModel() {
      * Load initial cards from repository
      */
     private fun loadCards() {
+        Log.d(TAG, "loadCards() - Starting...")
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
-            // Simulate network delay for realism
-            kotlinx.coroutines.delay(300)
+            try {
+                repository.getJobCards(
+                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                    location = ApiConfig.DEFAULT_LOCATION,
+                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
+                ).collect { result ->
+                    result.fold(
+                        onSuccess = { cards ->
+                            Log.d(TAG, "loadCards() - SUCCESS: Got ${cards.size} cards")
+                            _uiState.update {
+                                it.copy(
+                                    cards = cards,
+                                    isLoading = false,
+                                    isEmpty = cards.isEmpty(),
+                                    error = null,
+                                    hasMorePages = repository.hasMorePages(),
+                                    totalJobs = repository.getTotalCount()
+                                )
+                            }
+                        },
+                        onFailure = { exception ->
+                            val errorMessage = exception.message ?: "Failed to load jobs"
+                            Log.e(TAG, "loadCards() - FAILURE: $errorMessage", exception)
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = errorMessage
+                                )
+                            }
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                val errorMessage = e.message ?: "An unexpected error occurred"
+                Log.e(TAG, "loadCards() - EXCEPTION: $errorMessage", e)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = errorMessage
+                    )
+                }
+            }
+        }
+    }
 
-            val cards = MockJobRepository.getJobCards()
-            _uiState.update {
-                it.copy(
-                    cards = cards,
-                    isLoading = false,
-                    isEmpty = cards.isEmpty()
+    /**
+     * Load more jobs (pagination)
+     */
+    fun loadMoreJobs() {
+        if (_uiState.value.isLoadingMore || !_uiState.value.hasMorePages) return
+        
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+            
+            try {
+                val result = repository.loadMoreJobs(
+                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                    location = ApiConfig.DEFAULT_LOCATION,
+                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
                 )
+                
+                result.fold(
+                    onSuccess = { allCards ->
+                        // Filter out already swiped cards
+                        val swipedIds = _uiState.value.interestedCards.map { it.id } + 
+                                       _uiState.value.skippedCards.map { it.id }
+                        val newCards = allCards.filter { it.id !in swipedIds }
+                        
+                        _uiState.update {
+                            it.copy(
+                                cards = newCards,
+                                isLoadingMore = false,
+                                hasMorePages = repository.hasMorePages(),
+                                totalJobs = repository.getTotalCount()
+                            )
+                        }
+                    },
+                    onFailure = { exception ->
+                        _uiState.update {
+                            it.copy(
+                                isLoadingMore = false,
+                                error = exception.message
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingMore = false,
+                        error = e.message
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Refresh cards from API
+     */
+    fun refreshCards() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            try {
+                val result = repository.refreshJobs(
+                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                    location = ApiConfig.DEFAULT_LOCATION,
+                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
+                )
+                
+                result.fold(
+                    onSuccess = { cards ->
+                        _uiState.update {
+                            it.copy(
+                                cards = cards,
+                                isLoading = false,
+                                isEmpty = cards.isEmpty(),
+                                error = null,
+                                hasMorePages = repository.hasMorePages(),
+                                totalJobs = repository.getTotalCount()
+                            )
+                        }
+                    },
+                    onFailure = { exception ->
+                        val errorMessage = exception.message ?: "Failed to refresh jobs"
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = errorMessage
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                val errorMessage = e.message ?: "An unexpected error occurred"
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = errorMessage
+                    )
+                }
             }
         }
     }
@@ -84,15 +231,21 @@ class HomeViewModel : ViewModel() {
                 isInterested = direction == SwipeDirection.RIGHT
             )
 
-            // Create undoable action
             val undoableAction = UndoableAction(
                 card = card,
                 result = result
             )
 
-            // Update state based on direction
+            val currentState = _uiState.value
+            val newCards = currentState.cards.filter { it.id != card.id }
+            val hasMore = currentState.hasMorePages
+            
+            // Pre-emptively load more when running low (before cards run out)
+            if (newCards.size < 5 && hasMore && !currentState.isLoadingMore) {
+                loadMoreJobs()
+            }
+
             _uiState.update { state ->
-                val newCards = state.cards.filter { it.id != card.id }
                 val newInterested = if (direction == SwipeDirection.RIGHT) {
                     state.interestedCards + card
                 } else state.interestedCards
@@ -100,14 +253,16 @@ class HomeViewModel : ViewModel() {
                     state.skippedCards + card
                 } else state.skippedCards
 
-                // Add to undo history
                 val newUndoHistory = state.undoHistory + undoableAction
+                
+                // Only set isEmpty if no more pages AND no cards
+                val actuallyEmpty = newCards.isEmpty() && !state.hasMorePages
 
                 state.copy(
                     cards = newCards,
                     interestedCards = newInterested,
                     skippedCards = newSkipped,
-                    isEmpty = newCards.isEmpty(),
+                    isEmpty = actuallyEmpty,
                     undoHistory = newUndoHistory,
                     canUndo = newUndoHistory.isNotEmpty()
                 )
