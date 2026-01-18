@@ -15,95 +15,196 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+// Imports from your version (Supabase)
+import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.ui.theme.*
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.OAuthProvider
+import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+
+// Custom OIDC Provider Object (Your fix)
+object LinkedInOidc : OAuthProvider() {
+    override val name = "linkedin_oidc"
+}
 
 /**
  * Onboarding screen - first screen users see.
- * Minimal, professional, with LinkedIn CTA.
+ * Minimal, professional, with LinkedIn/Google CTA and Debug option.
  */
 @Composable
 fun OnboardingScreen(
-    onContinueWithLinkedIn: () -> Unit,
+    onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Subtle fade-in animation
+    // --- State & Supabase Setup (Your Version) ---
+    val supabase = SupabaseClient.client
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Auto-login loop prevention
+    var isJustLoggedOut by remember { mutableStateOf(false) }
+
+    // --- State for Debug Screen (Contributor's Version) ---
+    var showDebugScreen by remember { mutableStateOf(false) }
+
+    // Check if we should show the debug screen overlay
+    if (showDebugScreen) {
+        // Assuming DebugScreen is defined elsewhere in your project
+        // If not, you might need to import it or comment this out until merged
+        // DebugScreen(onBack = { showDebugScreen = false }) 
+        
+        // Placeholder in case the file isn't imported yet:
+         Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
+             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                 Text("Debug Screen Placeholder")
+                 Button(onClick = { showDebugScreen = false }) { Text("Back") }
+             }
+         }
+         return
+    }
+
+    // --- Auth Listener (Your Version) ---
+    LaunchedEffect(Unit) {
+        supabase.auth.sessionStatus.collectLatest { status ->
+            when (status) {
+                is SessionStatus.Authenticated -> {
+                    if (!isJustLoggedOut) {
+                        onContinue()
+                    }
+                }
+                else -> {
+                    isJustLoggedOut = false
+                }
+            }
+        }
+    }
+
+    // --- Animation ---
     val animatedAlpha = remember { Animatable(0f) }
-    
+
     LaunchedEffect(Unit) {
         animatedAlpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(
-                durationMillis = 800,
-                easing = EaseOutCubic
-            )
+            animationSpec = tween(durationMillis = 800, easing = EaseOutCubic)
         )
     }
-    
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(BackgroundLight)
-            .padding(horizontal = 32.dp)
-            .alpha(animatedAlpha.value),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+
+    // --- UI Content ---
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(BackgroundLight)
+                .padding(horizontal = 32.dp)
+                .alpha(animatedAlpha.value),
+            contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // App logo / branding
-            AppLogo()
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // App name
-            Text(
-                text = "SwipeApply",
-                style = MaterialTheme.typography.displayMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Tagline
-            Text(
-                text = "Discover hiring teams.\nApply smarter.",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = MaterialTheme.typography.titleLarge.lineHeight
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // LinkedIn CTA Button
-            LinkedInButton(
-                onClick = onContinueWithLinkedIn,
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Trust text
-            Text(
-                text = "No spam. No auto emails.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextTertiary,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(48.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Spacer(modifier = Modifier.weight(1f))
+
+                AppLogo()
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Text(
+                    text = "SwipeApply",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Discover hiring teams.\nApply smarter.",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = MaterialTheme.typography.titleLarge.lineHeight
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // --- Google Button (Your Version) ---
+                GoogleButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                supabase.auth.signInWith(
+                                    provider = Google,
+                                    redirectUrl = "swipeapply://callback"
+                                )
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("Error: ${e.message}")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- LinkedIn Button (Combined) ---
+                // Uses your OIDC logic + UI style
+                LinkedInButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                supabase.auth.signInWith(
+                                    provider = LinkedInOidc, // Custom Object
+                                    redirectUrl = "swipeapply://callback"
+                                )
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("Error: ${e.message}")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "No spam. No auto emails.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextTertiary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // --- Test API Button (Contributor's Version) ---
+                TextButton(
+                    onClick = { showDebugScreen = true }
+                ) {
+                    Text(
+                        "🧪 Test API",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextTertiary
+                    )
+                }
+            }
         }
     }
 }
 
+// ----------------------------------------------------------------
+// Helper Composables
+// ----------------------------------------------------------------
+
 @Composable
 private fun AppLogo() {
-    // Animated gradient logo
     val infiniteTransition = rememberInfiniteTransition(label = "logo")
     val animatedOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -114,17 +215,13 @@ private fun AppLogo() {
         ),
         label = "gradientOffset"
     )
-    
+
     Box(
         modifier = Modifier
             .size(100.dp)
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(
-                        GradientStart,
-                        GradientEnd,
-                        GradientStart
-                    )
+                    colors = listOf(GradientStart, GradientEnd, GradientStart)
                 ),
                 shape = RoundedCornerShape(24.dp)
             ),
@@ -140,15 +237,68 @@ private fun AppLogo() {
 }
 
 @Composable
-private fun LinkedInButton(
+private fun GoogleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val GoogleBlue = Color(0xFF4285F4)
+
     Box(
         modifier = modifier
             .height(56.dp)
             .background(
-                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(GoogleBlue, GoogleBlue.copy(alpha = 0.85f))
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clip(RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        TextButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(color = Color.White, shape = RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "G",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = GoogleBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "Continue with Google",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinkedInButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val LinkedInBlue = Color(0xFF0A66C2)
+
+    Box(
+        modifier = modifier
+            .height(56.dp)
+            .background(
+                brush = Brush.horizontalGradient(
                     colors = listOf(LinkedInBlue, LinkedInBlue.copy(alpha = 0.85f))
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -156,22 +306,15 @@ private fun LinkedInButton(
             .clip(RoundedCornerShape(16.dp)),
         contentAlignment = Alignment.Center
     ) {
-        TextButton(
-            onClick = onClick,
-            modifier = Modifier.fillMaxSize()
-        ) {
+        TextButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                // LinkedIn icon placeholder
                 Box(
                     modifier = Modifier
                         .size(24.dp)
-                        .background(
-                            color = Color.White,
-                            shape = RoundedCornerShape(4.dp)
-                        ),
+                        .background(color = Color.White, shape = RoundedCornerShape(4.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -181,9 +324,9 @@ private fun LinkedInButton(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.width(12.dp))
-                
+
                 Text(
                     text = "Continue with LinkedIn",
                     style = MaterialTheme.typography.titleMedium,

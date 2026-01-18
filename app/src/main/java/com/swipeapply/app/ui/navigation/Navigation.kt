@@ -3,17 +3,20 @@ package com.swipeapply.app.ui.navigation
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.JobCard
-import com.swipeapply.app.data.repository.MockJobRepository
+import com.swipeapply.app.data.repository.JobRepository
 import com.swipeapply.app.ui.screens.HomeScreen
 import com.swipeapply.app.ui.screens.IntroTemplateScreen
 import com.swipeapply.app.ui.screens.OnboardingScreen
+import kotlinx.coroutines.runBlocking
 
 /**
  * Navigation routes
@@ -72,7 +75,7 @@ fun SwipeApplyNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) }
         ) {
             OnboardingScreen(
-                onContinueWithLinkedIn = {
+                onContinue = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -88,7 +91,18 @@ fun SwipeApplyNavHost(
                     navController.navigate(Screen.IntroTemplate.createRoute(jobCard.id))
                 },
                 onDarkModeToggle = onDarkModeToggle,
-                isDarkModeEnabled = isDarkModeEnabled
+                isDarkModeEnabled = isDarkModeEnabled,
+                // NEW: Handle sign out navigation
+                onSignOutSuccess = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        // Clear everything – very aggressive
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        // Alternative (even stronger): popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                        restoreState = false          // ← Prevents restoring any old state
+                    }
+                }
+
             )
         }
         
@@ -99,13 +113,24 @@ fun SwipeApplyNavHost(
                 navArgument("jobId") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val context = LocalContext.current
             val jobId = backStackEntry.arguments?.getString("jobId") ?: return@composable
-            val jobCard = MockJobRepository.getJobCardById(jobId) ?: return@composable
             
-            IntroTemplateScreen(
-                jobCard = jobCard,
-                onBack = { navController.popBackStack() }
-            )
+            // Get real job from repository
+            val repository = JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY)
+            var jobCard by remember { mutableStateOf<JobCard?>(null) }
+            
+            LaunchedEffect(jobId) {
+                jobCard = repository.getJobCardById(jobId)
+            }
+            
+            // Show loading or the template screen
+            jobCard?.let { card ->
+                IntroTemplateScreen(
+                    jobCard = card,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
