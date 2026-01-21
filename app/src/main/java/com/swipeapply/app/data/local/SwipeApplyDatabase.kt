@@ -8,13 +8,14 @@ import androidx.room.TypeConverters
 import com.swipeapply.app.data.local.dao.JobDao
 import com.swipeapply.app.data.local.entity.Converters
 import com.swipeapply.app.data.local.entity.JobEntity
+import com.swipeapply.app.data.local.entity.SwipedJobEntity
 
 /**
  * Room database for SwipeApply app
  */
 @Database(
-    entities = [JobEntity::class],
-    version = 1,
+    entities = [JobEntity::class, SwipedJobEntity::class], 
+    version = 2, 
     exportSchema = false
 )
 @TypeConverters(Converters::class)

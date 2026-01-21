@@ -39,135 +39,118 @@ fun JobSwipeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rightSwipeColor = MaterialTheme.colorScheme.tertiary 
-    val leftSwipeColor = MaterialTheme.colorScheme.error
-    var isDescriptionExpanded by remember { mutableStateOf(false) }
-
     val borderColor by animateColorAsState(
         targetValue = when (swipeDirection) {
-            SwipeDirection.RIGHT -> rightSwipeColor.copy(alpha = swipeProgress)
-            SwipeDirection.LEFT -> leftSwipeColor.copy(alpha = swipeProgress)
+            SwipeDirection.RIGHT -> Color(0xFF4CAF50).copy(alpha = swipeProgress)
+            SwipeDirection.LEFT -> Color(0xFFE57373).copy(alpha = swipeProgress)
             SwipeDirection.NONE -> Color.Transparent
         },
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
         label = "borderColor"
     )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(0.65f)
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                spotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            )
-            .clip(RoundedCornerShape(20.dp))
-            .border(
-                width = 3.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(20.dp)
-            )
+            .fillMaxHeight(0.75f) // Increased height slightly for better fit
+            .shadow(8.dp, RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .border(3.dp, borderColor, RoundedCornerShape(24.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface 
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(16.dp)
             ) {
-                // Top section - Hiring badge + Logo
+                // --- Header Section (Fixed Height) ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    if (jobCard.isHiringNow) {
-                        HiringBadge()
-                    } else {
-                        Spacer(modifier = Modifier.width(1.dp))
-                    }
-                    
-                    // Company Logo
-                    CompanyLogo(
-                        companyName = jobCard.company.name,
-                        logoUrl = jobCard.company.logoUrl
-                    )
-                }
-
-                // Company name
-                Text(
-                    text = jobCard.company.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Job title
-                Text(
-                    text = jobCard.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Location chips
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LocationChip(
-                        location = jobCard.location,
-                        locationType = jobCard.locationType.label
-                    )
-                }
-
-                // Salary if available
-                jobCard.salary?.let { salary ->
-                    Text(
-                        text = salary.formatted(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                // Job Description with Read More
-                JobDescription(
-                    description = jobCard.roleDescription,
-                    isExpanded = isDescriptionExpanded,
-                    onToggle = { isDescriptionExpanded = !isDescriptionExpanded }
-                )
-
-                // Tech stack
-                if (jobCard.techStack.isNotEmpty()) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Tech Stack",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            text = jobCard.company.name,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TechStackChips(techStack = jobCard.techStack)
+                        Text(
+                            text = jobCard.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
+                    CompanyLogo(jobCard.company.name, jobCard.company.logoUrl)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- Chips Row ---
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    LocationChip(jobCard.location, jobCard.locationType.label)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    if(jobCard.isHiringNow) HiringBadge()
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                // --- Scrollable Description (Flexible Height) ---
+                // This 'weight' ensures it takes up remaining space but doesn't push bottom content off
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 12.dp)
+                ) {
+                    Text(
+                        text = "About the Role",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = jobCard.roleDescription.cleanHtml(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4
+                    )
+                }
+
+                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- Footer / Tech Stack (Fixed Bottom) ---
+                if (jobCard.techStack.isNotEmpty()) {
+                    Text(
+                        text = "Tech Stack",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TechStackChips(jobCard.techStack)
                 }
             }
 
-            SwipeOverlay(
-                direction = swipeDirection,
-                progress = swipeProgress
-            )
+            // Overlay for Swiping
+            SwipeOverlay(swipeDirection, swipeProgress)
         }
     }
+}
+
+// Helper to clean description
+fun String.cleanHtml(): String {
+    return this.replace(Regex("<[^>]*>"), "")
+        .replace("&amp;", "&")
+        .replace("&nbsp;", " ")
+        .trim()
 }
 
 @Composable
