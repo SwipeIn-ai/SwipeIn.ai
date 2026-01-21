@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.min
 
 private const val TAG = "HomeViewModel"
 
@@ -59,9 +60,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val _swipeHistory = MutableStateFlow<List<SwipeResult>>(emptyList())
-    val swipeHistory: StateFlow<List<SwipeResult>> = _swipeHistory.asStateFlow()
-
     init {
         loadCards()
     }
@@ -89,8 +87,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                     isLoading = false,
                                     isEmpty = cards.isEmpty(),
                                     error = null,
-                                    hasMorePages = repository.hasMorePages(),
-                                    totalJobs = repository.getTotalCount()
+                                    hasMorePages = true, // Reset assumption
+                                    totalJobs = repository.getTotalCount() // Optional: might not be accurate with filter
                                 )
                             }
                         },
@@ -119,184 +117,93 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Load more jobs (pagination)
-     */
-    fun loadMoreJobs() {
-        if (_uiState.value.isLoadingMore || !_uiState.value.hasMorePages) return
-        
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMore = true) }
-            
-            try {
-                val result = repository.loadMoreJobs(
-                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
-                    location = ApiConfig.DEFAULT_LOCATION,
-                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
-                )
-                
-                result.fold(
-                    onSuccess = { allCards ->
-                        // Filter out already swiped cards
-                        val swipedIds = _uiState.value.interestedCards.map { it.id } + 
-                                       _uiState.value.skippedCards.map { it.id }
-                        val newCards = allCards.filter { it.id !in swipedIds }
-                        
-                        _uiState.update {
-                            it.copy(
-                                cards = newCards,
-                                isLoadingMore = false,
-                                hasMorePages = repository.hasMorePages(),
-                                totalJobs = repository.getTotalCount()
-                            )
-                        }
-                    },
-                    onFailure = { exception ->
-                        _uiState.update {
-                            it.copy(
-                                isLoadingMore = false,
-                                error = exception.message
-                            )
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoadingMore = false,
-                        error = e.message
-                    )
-                }
-            }
-        }
-    }
+   
 
     /**
      * Refresh cards from API
      */
     fun refreshCards() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            
-            try {
-                val result = repository.refreshJobs(
-                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
-                    location = ApiConfig.DEFAULT_LOCATION,
-                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
-                )
-                
+    // Reset UI state first
+    _uiState.update { it.copy(cards = emptyList(), isLoading = true, error = null) }
+    
+    viewModelScope.launch {
+        try {
+            repository.getJobCards(
+                search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                location = ApiConfig.DEFAULT_LOCATION,
+                remote = ApiConfig.DEFAULT_REMOTE_ONLY,
+                forceRefresh = true
+            ).collect { result ->
                 result.fold(
                     onSuccess = { cards ->
-                        _uiState.update {
+                        _uiState.update { 
                             it.copy(
-                                cards = cards,
-                                isLoading = false,
-                                isEmpty = cards.isEmpty(),
-                                error = null,
-                                hasMorePages = repository.hasMorePages(),
-                                totalJobs = repository.getTotalCount()
-                            )
+                                cards = cards, 
+                                isLoading = false, 
+                                isEmpty = cards.isEmpty()
+                            ) 
                         }
                     },
-                    onFailure = { exception ->
-                        val errorMessage = exception.message ?: "Failed to refresh jobs"
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = errorMessage
-                            )
+                    onFailure = { e ->
+                        _uiState.update { 
+                            it.copy(isLoading = false, error = e.message) 
                         }
                     }
                 )
-            } catch (e: Exception) {
-                val errorMessage = e.message ?: "An unexpected error occurred"
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = errorMessage
-                    )
-                }
             }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isLoading = false, error = e.message) }
         }
     }
+}
 
-    /**
-     * Handle a card being swiped
-     */
-    fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
+// Replace your existing onCardSwiped with this:
+fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
         viewModelScope.launch {
-            val result = SwipeResult(
-                cardId = card.id,
-                direction = direction,
-                isInterested = direction == SwipeDirection.RIGHT
-            )
+            // 1. Record Swipe
+            repository.recordSwipe(card.id, direction.name)
 
-            val undoableAction = UndoableAction(
-                card = card,
-                result = result
+            // 2. Fetch exactly ONE replacement job from queue
+            val nextJob = repository.getNextJobFromQueue(
+                search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                location = ApiConfig.DEFAULT_LOCATION,
+                remote = ApiConfig.DEFAULT_REMOTE_ONLY
             )
-
-            val currentState = _uiState.value
-            val newCards = currentState.cards.filter { it.id != card.id }
-            val hasMore = currentState.hasMorePages
-            
-            // Pre-emptively load more when running low (before cards run out)
-            if (newCards.size < 5 && hasMore && !currentState.isLoadingMore) {
-                loadMoreJobs()
-            }
 
             _uiState.update { state ->
-                val newInterested = if (direction == SwipeDirection.RIGHT) {
-                    state.interestedCards + card
-                } else state.interestedCards
-                val newSkipped = if (direction == SwipeDirection.LEFT) {
-                    state.skippedCards + card
-                } else state.skippedCards
+                // 3. Remove swiped card
+                val currentList = state.cards.toMutableList()
+                currentList.removeIf { it.id == card.id }
 
-                val newUndoHistory = state.undoHistory + undoableAction
-                
-                // Only set isEmpty if no more pages AND no cards
-                val actuallyEmpty = newCards.isEmpty() && !state.hasMorePages
+                // 4. Add replacement to back
+                if (nextJob != null) {
+                    currentList.add(nextJob)
+                }
+
+                // 5. Update State
+                val result = SwipeResult(card.id, direction, direction == SwipeDirection.RIGHT)
+                val undoableAction = UndoableAction(card, result)
 
                 state.copy(
-                    cards = newCards,
-                    interestedCards = newInterested,
-                    skippedCards = newSkipped,
-                    isEmpty = actuallyEmpty,
-                    undoHistory = newUndoHistory,
-                    canUndo = newUndoHistory.isNotEmpty()
+                    cards = currentList,
+                    isEmpty = currentList.isEmpty() && nextJob == null,
+                    interestedCards = if (direction == SwipeDirection.RIGHT) state.interestedCards + card else state.interestedCards,
+                    skippedCards = if (direction == SwipeDirection.LEFT) state.skippedCards + card else state.skippedCards,
+                    undoHistory = state.undoHistory + undoableAction,
+                    canUndo = true
                 )
             }
         }
     }
 
-    /**
-     * Select a card to show details in bottom sheet
-     */
     fun selectCard(card: JobCard) {
-        _uiState.update {
-            it.copy(
-                selectedCard = card,
-                showBottomSheet = true
-            )
-        }
+        _uiState.update { it.copy(selectedCard = card, showBottomSheet = true) }
     }
 
-    /**
-     * Dismiss the bottom sheet
-     */
     fun dismissBottomSheet() {
-        _uiState.update {
-            it.copy(
-                showBottomSheet = false,
-                selectedCard = null
-            )
-        }
+        _uiState.update { it.copy(showBottomSheet = false, selectedCard = null) }
     }
 
-    /**
-     * Undo the last swipe
-     */
     fun undoLastSwipe() {
         viewModelScope.launch {
             val undoHistory = _uiState.value.undoHistory
@@ -318,13 +225,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Undo multiple swipes
-     */
     fun undoSwipes(count: Int) {
         viewModelScope.launch {
             val undoHistory = _uiState.value.undoHistory
-            val actualCount = minOf(count, undoHistory.size)
+            val actualCount = min(count, undoHistory.size)
             if (actualCount == 0) return@launch
 
             val actionsToUndo = undoHistory.takeLast(actualCount)
@@ -350,26 +254,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Clear undo history
-     */
     fun clearUndoHistory() {
-        _uiState.update {
-            it.copy(
-                undoHistory = emptyList(),
-                canUndo = false
-            )
-        }
+        _uiState.update { it.copy(undoHistory = emptyList(), canUndo = false) }
     }
 
-    /**
-     * Get undo history count
-     */
     fun getUndoCount(): Int = _uiState.value.undoHistory.size
 
-    /**
-     * Reset all cards
-     */
     fun resetCards() {
         _uiState.update {
             it.copy(
@@ -382,9 +272,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadCards()
     }
 
-    /**
-     * Get stats for display
-     */
     fun getStats(): SwipeStats {
         val state = _uiState.value
         return SwipeStats(
@@ -394,6 +281,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             undoCount = state.undoHistory.size
         )
     }
+    fun performSignOut() {
+        viewModelScope.launch {
+            // WIPE ALL DATA so the next user (or same user) gets a fresh start
+            repository.clearSwipeHistory()
+            _uiState.update { HomeUiState() } // Reset UI state
+        }
+    }
+    fun debugClearHistory() {
+    viewModelScope.launch {
+        // Clear DB table
+        repository.clearSwipeHistory() 
+        // Reset UI
+        refreshCards()
+    }
+}
 }
 
 data class SwipeStats(

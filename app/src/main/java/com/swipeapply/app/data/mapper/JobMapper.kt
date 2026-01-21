@@ -15,13 +15,20 @@ private const val TAG = "JobMapper"
 fun FindWorkJob.toEntity(): JobEntity {
     try {
         Log.d(TAG, "toEntity() - ID: $id, Company: $companyName")
-        
+        fun String?.cleanHtml(): String {
+        if (this == null) return ""
+        return this.replace(Regex("<[^>]*>"), "") // Strips all <tags>
+            .replace("&amp;", "&")
+            .replace("&nbsp;", " ")
+            .replace("&quot;", "\"")
+            .replace(Regex("\\s+"), " ") // Collapses extra whitespace
+            .trim()
+    }
         // Safely trim and validate
         val roleText = this.role.trim().takeIf { it.isNotEmpty() } ?: "Unknown Role"
         val companyText = this.companyName.trim().takeIf { it.isNotEmpty() } ?: "Unknown Company"
         val locationText = this.location?.trim() ?: "Remote"
         
-        Log.d(TAG, "toEntity() - Processed: role=$roleText, company=$companyText, location=$locationText")
         
         val entity = JobEntity(
             id = this.id.trim(),
@@ -30,7 +37,7 @@ fun FindWorkJob.toEntity(): JobEntity {
             location = locationText,
             remote = this.remote,
             url = this.url?.trim(),
-            description = this.text?.trim(),
+            description = this.text?.cleanHtml(),
             datePosted = this.datePosted,
             keywords = this.keywords?.joinToString(","),
             source = this.source,
@@ -58,7 +65,6 @@ fun JobEntity.toJobCard(): JobCard {
             .replace(Regex("[^a-z0-9_]"), "")
             .takeIf { it.isNotEmpty() } ?: "unknown_company"
         
-        Log.d(TAG, "toJobCard() - Creating company with ID: $companyId")
         
         val company = Company(
             id = companyId,
@@ -80,7 +86,6 @@ fun JobEntity.toJobCard(): JobCard {
         val description = this.description?.trim()?.takeIf { it.isNotEmpty() } 
             ?: "Exciting opportunity to join ${this.companyName} as a ${this.role}."
         
-        Log.d(TAG, "toJobCard() - Building JobCard...")
         
         val jobCard = JobCard(
             id = this.id.trim(),

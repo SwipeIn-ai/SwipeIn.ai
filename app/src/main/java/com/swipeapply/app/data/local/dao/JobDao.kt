@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.swipeapply.app.data.local.entity.JobEntity
 import kotlinx.coroutines.flow.Flow
+import com.swipeapply.app.data.local.entity.SwipedJobEntity
 
 /**
  * Data Access Object for Job entities
@@ -33,4 +34,13 @@ interface JobDao {
     
     @Query("DELETE FROM jobs WHERE fetchedAt < :timestamp")
     suspend fun deleteOldJobs(timestamp: Long)
+
+    @Query("SELECT jobId FROM swiped_jobs")
+    suspend fun getAllSwipedJobIds(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSwipedJob(swipedJob: SwipedJobEntity)
+
+    @Query("DELETE FROM swiped_jobs")
+    suspend fun deleteAllSwipedJobs()
 }
