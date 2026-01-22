@@ -47,12 +47,11 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     private var hasMorePages = true
     private var totalCount = 0
     private var isFetching = false
-
-    // To prevent infinite fallback loops
     private var isFallbackMode = false
 
     /**
      * Get INITIAL batch of 15 jobs.
+     * Logic: Try API -> If Empty/Fail -> Load from DB
      */
     fun getJobCards(
         search: String? = null,
@@ -62,21 +61,27 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     ): Flow<Result<List<JobCard>>> = flow {
         if (forceRefresh) clearCache()
 
-        // 1. Try filling queue with requested criteria
+        // 1. Try filling queue from API
         if (jobQueue.isEmpty()) {
             fetchAndQueueJobs(search, location, remote)
         }
 
-        // 2. FALLBACK: If queue is still empty (all duplicates?), try broad search
+        // 2. DB FALLBACK: If API didn't give us anything (network error or empty), check local DB
+        if (jobQueue.isEmpty()) {
+            Log.w(TAG, "API empty/failed. Attempting Local Database Fallback...")
+            loadFromDatabaseFallback()
+        }
+
+        // 3. REMOTE FALLBACK: If even DB is empty, try broader API search
         if (jobQueue.isEmpty() && !isFallbackMode) {
-            Log.w(TAG, "Primary search exhausted. Switching to Remote Fallback.")
+            Log.w(TAG, "Local DB empty. Switching to Remote Fallback.")
             isFallbackMode = true
             currentPage = 1
             hasMorePages = true
-            fetchAndQueueJobs(null, null, true) // Fetch Remote jobs
+            fetchAndQueueJobs(null, null, true)
         }
 
-        // 3. Prepare Initial Batch (Max 15)
+        // 4. Prepare Batch for UI (Max 15)
         val initialBatch = mutableListOf<JobCard>()
         repeat(15) {
             jobQueue.removeFirstOrNull()?.let { 
@@ -88,29 +93,27 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         if (initialBatch.isNotEmpty()) {
             emit(Result.success(initialBatch))
         } else {
-            // Only emit failure if BOTH primary and fallback failed
-            emit(Result.failure(Exception("No new jobs found. Try clearing history.")))
+            emit(Result.failure(Exception("No jobs found (Online or Offline). Try clearing history.")))
         }
     }.flowOn(Dispatchers.IO)
 
     /**
-     * Pops ONE job from the queue to refill the UI.
+     * Pops ONE job from queue.
+     * Triggers background fetch if low.
      */
     suspend fun getNextJobFromQueue(
         search: String?, location: String?, remote: Boolean?
     ): JobCard? = withContext(Dispatchers.IO) {
         
-        // Trigger fetch if low (< 5)
+        // Background fetch trigger
         if (jobQueue.size < 5 && hasMorePages && !isFetching) {
             try {
-                // If we are in fallback mode, ignore user filters and fetch remote
-                if (isFallbackMode) {
-                    fetchAndQueueJobs(null, null, true)
-                } else {
-                    fetchAndQueueJobs(search, location, remote)
-                }
+                if (isFallbackMode) fetchAndQueueJobs(null, null, true)
+                else fetchAndQueueJobs(search, location, remote)
             } catch (e: Exception) {
-                Log.e(TAG, "Background fetch failed", e)
+                Log.e(TAG, "Background fetch failed, trying DB...", e)
+                // If background fetch fails, try squeezing more from DB
+                loadFromDatabaseFallback()
             }
         }
 
@@ -120,7 +123,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     }
 
     /**
-     * Recursive fetcher. Loops pages until it finds unseen jobs.
+     * Fetch from API -> Save to DB -> Add to Queue
      */
     private suspend fun fetchAndQueueJobs(search: String?, location: String?, remote: Boolean?) {
         if (isFetching) return
@@ -130,10 +133,8 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         val swipedIds = jobDao.getAllSwipedJobIds().toSet()
 
         try {
-            // Fetch until queue has buffer or we run out of pages
             while (hasMorePages && jobQueue.size < 20) {
-                Log.d(TAG, "Fetching Page $currentPage (Fallback: $isFallbackMode)")
-                
+                Log.d(TAG, "Fetching Page $currentPage...")
                 val response = apiService.getJobs(
                     authToken = authToken,
                     search = search,
@@ -146,11 +147,21 @@ class JobRepository(private val context: Context, private val apiKey: String) {
                 hasMorePages = response.next != null
                 totalCount = response.count
 
-                val rawJobs = response.results.mapNotNull { 
-                    try { it.toEntity().toJobCard() } catch (e: Exception) { null } 
+                // 1. Map to Entities (Clean HTML happens here via Mapper)
+                val jobEntities = response.results.map { it.toEntity() }
+                
+                // 2. SAVE TO DB (Persistence)
+                if (jobEntities.isNotEmpty()) {
+                    jobDao.insertJobs(jobEntities)
+                    Log.d(TAG, "Saved ${jobEntities.size} jobs to local database.")
                 }
 
-                // FILTER: Remove jobs already swiped OR already in the queue
+                // 3. Convert to Cards for Queue
+                val rawJobs = jobEntities.mapNotNull { 
+                    try { it.toJobCard() } catch (e: Exception) { null } 
+                }
+
+                // 4. Filter Duplicates (Swiped or already queued)
                 val validJobs = rawJobs.filter { 
                     !swipedIds.contains(it.id) && !queuedJobIds.contains(it.id) 
                 }
@@ -162,17 +173,38 @@ class JobRepository(private val context: Context, private val apiKey: String) {
 
                 currentPage++
                 
-                if (validJobs.isEmpty() && hasMorePages) {
-                    Log.w(TAG, "Page yielded duplicates only. Next page...")
-                } else if (validJobs.isEmpty() && !hasMorePages) {
-                    Log.w(TAG, "End of results reached.")
-                    break
-                }
+                if (validJobs.isEmpty() && !hasMorePages) break
             }
         } catch (e: Exception) {
             Log.e(TAG, "Fetch error: ${e.message}")
         } finally {
             isFetching = false
+        }
+    }
+
+    /**
+     * Load unswiped jobs from Local DB into the Queue
+     */
+    private suspend fun loadFromDatabaseFallback() {
+        val dbJobs = jobDao.getAvailableJobs() // Uses the new NOT IN query
+        
+        val newCards = dbJobs.mapNotNull { 
+            try { it.toJobCard() } catch(e: Exception) { null } 
+        }.filter { 
+            !queuedJobIds.contains(it.id) // Don't add if already in queue
+        }
+
+        if (newCards.isNotEmpty()) {
+            Log.d(TAG, "Loaded ${newCards.size} jobs from Offline Database")
+            // Add to front of queue to show immediately
+            newCards.forEach { 
+                if (!queuedJobIds.contains(it.id)) {
+                    jobQueue.add(it)
+                    queuedJobIds.add(it.id)
+                }
+            }
+        } else {
+            Log.w(TAG, "Database is empty or all jobs swiped.")
         }
     }
 
@@ -194,7 +226,6 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         clearCache()
     }
 
-    // Helper to allow refresh to work with existing ViewModel logic
     suspend fun refreshJobs(search: String?, location: String?, remote: Boolean?): Result<List<JobCard>> {
         var result: Result<List<JobCard>> = Result.failure(Exception("Unknown"))
         getJobCards(search, location, remote, true).collect { result = it }
@@ -203,7 +234,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
 
     fun hasMorePages() = hasMorePages
     fun getTotalCount() = totalCount
-    suspend fun getJobCardById(id: String): JobCard? = null // Simplified for now
+    suspend fun getJobCardById(id: String): JobCard? = null
 
     companion object {
         private const val TAG = "JobRepository"

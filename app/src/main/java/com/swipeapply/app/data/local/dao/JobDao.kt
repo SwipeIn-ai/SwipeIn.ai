@@ -43,4 +43,7 @@ interface JobDao {
 
     @Query("DELETE FROM swiped_jobs")
     suspend fun deleteAllSwipedJobs()
+
+    @Query("SELECT * FROM jobs WHERE id NOT IN (SELECT jobId FROM swiped_jobs) ORDER BY fetchedAt DESC")
+    suspend fun getAvailableJobs(): List<JobEntity>
 }
