@@ -31,6 +31,7 @@ object LinkedInOidc : OAuthProvider() {
 @Composable
 fun OnboardingScreen(
     onContinue: () -> Unit,
+    onSkipLogin: () -> Unit = {}, // Dev mode bypass
     modifier: Modifier = Modifier
 ) {
     val supabase = SupabaseClient.client
@@ -157,7 +158,7 @@ fun OnboardingScreen(
                 // Only visible in debug/testing builds if you want, 
                 // but keeping it simple for now as requested.
                 TextButton(
-                    onClick = { onContinue() }, // <--- BYPASS LOGIC
+                    onClick = { onSkipLogin() }, // <--- BYPASS LOGIC (Dev Mode)
                     colors = ButtonDefaults.textButtonColors(contentColor = AccentRed)
                 ) {
                     Text("Skip Login (Dev Mode)")

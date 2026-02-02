@@ -3,6 +3,7 @@ package com.swipeapply.app
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.ExternalAuthAction
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.postgrest.Postgrest
 
 object SupabaseClient {
     val client = createSupabaseClient(
@@ -14,5 +15,6 @@ object SupabaseClient {
             host = "callback"
             defaultExternalAuthAction = ExternalAuthAction.CustomTabs()
         }
+        install(Postgrest)
     }
 }

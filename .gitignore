@@ -2,6 +2,7 @@
 .gradle/
 build/
 **/build/
+.env
 
 .idea/
 *.iml
