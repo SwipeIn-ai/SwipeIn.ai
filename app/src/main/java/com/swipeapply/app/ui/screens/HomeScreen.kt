@@ -46,10 +46,12 @@ import com.swipeapply.app.ui.components.swipe.SwipeCardStack
 import com.swipeapply.app.ui.theme.*
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
 import com.swipeapply.app.ui.viewmodel.UndoableAction
+import com.swipeapply.app.ui.viewmodel.ViewModelFactory
 import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.app.Application
 
 /**
  * Main home screen with card stack and swipe actions.
@@ -67,15 +69,15 @@ fun HomeScreen(
 ) {
     // --- 1. ViewModel Setup (From Job API changes) ---
     // We use a factory to pass the Application context to the ViewModel for API/Repo access
-    val context = LocalContext.current
-    val viewModel: HomeViewModel = viewModel(
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(context.applicationContext as android.app.Application) as T
-            }
-        }
-    )
+    // --- 1. ViewModel Setup (Correct + Reusable Factory) ---
+
+val application =
+    LocalContext.current.applicationContext as Application
+
+val viewModel: HomeViewModel = viewModel(
+    factory = ViewModelFactory(application)
+)
+
 
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current

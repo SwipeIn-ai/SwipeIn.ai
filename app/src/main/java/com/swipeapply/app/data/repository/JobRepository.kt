@@ -8,16 +8,39 @@ import com.swipeapply.app.data.local.entity.SwipedJobEntity
 import com.swipeapply.app.data.mapper.toEntity
 import com.swipeapply.app.data.mapper.toJobCard
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.data.model.EducationItem
+import com.swipeapply.app.data.model.ExperienceItem
+import com.swipeapply.app.data.model.ProjectItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import com.swipeapply.app.data.model.UserProfile
+import io.github.jan.supabase.postgrest.from
+
+/**
+ * Data class for Supabase profile table - must match column names exactly
+ */
+@Serializable
+data class SupabaseProfileData(
+    val id: String,
+    val full_name: String,
+    val email: String,
+    val phone: String,
+    val bio: String,
+    val skills: List<String>,
+    val tech_stack: List<String>,
+    val education: List<EducationItem>,
+    val experience: List<ExperienceItem>,
+    val projects: List<ProjectItem>
+)
 
 class JobRepository(private val context: Context, private val apiKey: String) {
 
@@ -235,6 +258,67 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     fun hasMorePages() = hasMorePages
     fun getTotalCount() = totalCount
     suspend fun getJobCardById(id: String): JobCard? = null
+    
+    /**
+     * Check if user profile exists in database
+     */
+    suspend fun hasUserProfile(userId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Checking if profile exists for user: $userId")
+            
+            val response = com.swipeapply.app.SupabaseClient.client
+                .from("profiles")
+                .select {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+            
+            // response.data is a JSON string like "[]" or "[{...}]"
+            val data = response.data
+            Log.d(TAG, "Profile query response: $data")
+            
+            // Check if the JSON array has any items
+            // "[]" means empty, "[{...}]" means has data
+            val hasProfile = data != "[]" && data.isNotEmpty() && data != "null"
+            Log.d(TAG, "Has profile: $hasProfile")
+            
+            return@withContext hasProfile
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking profile existence", e)
+            // On error, assume no profile exists so user can create one
+            return@withContext false
+        }
+    }
+    
+    suspend fun saveUserProfile(userId: String, profile: UserProfile): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // Create a properly typed @Serializable object for Supabase
+            val profileData = SupabaseProfileData(
+                id = userId,
+                full_name = profile.fullName,
+                email = profile.email,
+                phone = profile.phone,
+                bio = profile.bio,
+                skills = profile.skills,
+                tech_stack = profile.techStack,
+                education = profile.education,
+                experience = profile.experience,
+                projects = profile.projects
+            )
+
+            // Using Supabase-kt client with properly serializable data class
+            com.swipeapply.app.SupabaseClient.client.from("profiles").upsert(profileData) {
+                select()
+            }
+
+            Log.d(TAG, "Profile saved successfully for user: $userId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving profile", e)
+            Result.failure(e)
+        }
+    }
 
     companion object {
         private const val TAG = "JobRepository"

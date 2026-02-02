@@ -1,0 +1,218 @@
+package com.swipeapply.app.utils
+
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import com.swipeapply.app.BuildConfig
+import com.swipeapply.app.data.model.*
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+object ResumeParser {
+    private const val TAG = "ResumeParser"
+    private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+    private const val MODEL = "tngtech/deepseek-r1t2-chimera:free"
+    
+    // OkHttp client with longer timeouts for AI responses
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val jsonParser = Json { 
+        ignoreUnknownKeys = true 
+        isLenient = true 
+        coerceInputValues = true  // Convert invalid values gracefully
+    }
+
+    /**
+     * Parses a resume from a PDF file using OpenRouter AI.
+     * Extracts: name, email, phone, bio, skills, techStack, education, experience, projects
+     * 
+     * @param context Android context for content resolver
+     * @param uri URI of the PDF file to parse
+     * @return UserProfile with extracted data, or null if parsing fails
+     */
+    suspend fun parseResume(context: Context, uri: Uri): UserProfile? = withContext(Dispatchers.IO) {
+        try {
+            // 1. Extract Text from PDF
+            Log.d(TAG, "Extracting text from PDF...")
+            val pdfText = extractTextFromPdf(context, uri)
+            if (pdfText.isBlank()) {
+                Log.w(TAG, "PDF file is empty or unreadable")
+                return@withContext null
+            }
+            
+            Log.d(TAG, "Extracted ${pdfText.length} characters from PDF")
+
+            // 2. Send to OpenRouter for JSON extraction
+            Log.d(TAG, "Sending resume to OpenRouter ($MODEL) for analysis...")
+            val responseText = callOpenRouter(pdfText)
+            
+            if (responseText.isNullOrBlank()) {
+                Log.e(TAG, "OpenRouter returned empty response")
+                return@withContext null
+            }
+            
+            Log.d(TAG, "OpenRouter response received: ${responseText.take(200)}...")
+
+            // 3. Clean and parse JSON
+            val cleanedJson = cleanJsonResponse(responseText)
+            Log.d(TAG, "Attempting to parse JSON...")
+            val profile = jsonParser.decodeFromString<UserProfile>(cleanedJson)
+            
+            Log.d(TAG, "Successfully parsed resume for: ${profile.fullName}")
+            return@withContext profile
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing resume: ${e.message}", e)
+            return@withContext null
+        }
+    }
+
+    /**
+     * Calls OpenRouter API with the resume text and returns the AI response.
+     */
+    private fun callOpenRouter(resumeText: String): String? {
+        val apiKey = BuildConfig.OPENROUTER_API_KEY
+        if (apiKey.isBlank()) {
+            Log.e(TAG, "OpenRouter API key is not configured")
+            return null
+        }
+        
+        val prompt = buildResumeParsePrompt(resumeText)
+        
+        // Build request body
+        val requestBody = JSONObject().apply {
+            put("model", MODEL)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+            put("temperature", 0.3) // Lower temperature for more consistent JSON output
+            put("max_tokens", 4096)
+        }
+        
+        val request = Request.Builder()
+            .url(OPENROUTER_URL)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("HTTP-Referer", "https://swipeapply.app") // Required by OpenRouter
+            .addHeader("X-Title", "SwipeApply Resume Parser") // App identifier
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        
+        return try {
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
+            
+            if (!response.isSuccessful) {
+                Log.e(TAG, "OpenRouter API error: ${response.code} - $responseBody")
+                return null
+            }
+            
+            // Parse the OpenRouter response to extract the content
+            val jsonResponse = JSONObject(responseBody ?: "")
+            val choices = jsonResponse.optJSONArray("choices")
+            if (choices != null && choices.length() > 0) {
+                val message = choices.getJSONObject(0).optJSONObject("message")
+                message?.optString("content")
+            } else {
+                Log.e(TAG, "No choices in OpenRouter response")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "OpenRouter HTTP error: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Builds the prompt for the AI to parse resume information.
+     */
+    private fun buildResumeParsePrompt(resumeText: String): String {
+        return """
+            You are a resume parser. Extract the following information from the resume text below and return ONLY a valid JSON object.
+            Do not include markdown formatting (like ```json or ```).
+            Do not include any explanation or thinking - ONLY output the JSON.
+            If information is not found, use empty strings for text fields and empty arrays for list fields.
+            
+            Structure required (return valid JSON only):
+            {
+              "fullName": "string",
+              "email": "string",
+              "phone": "string",
+              "bio": "short professional summary string",
+              "skills": ["skill1", "skill2"],
+              "techStack": ["tech1", "tech2"],
+              "education": [{"school": "string", "degree": "string", "year": "string"}],
+              "experience": [{"company": "string", "role": "string", "duration": "string", "description": "string"}],
+              "projects": [{"name": "string", "description": "string", "techUsed": "string"}]
+            }
+
+            Resume Text:
+            $resumeText
+        """.trimIndent()
+    }
+
+    /**
+     * Cleans AI response by removing markdown code blocks, thinking tags, and extra whitespace.
+     */
+    private fun cleanJsonResponse(response: String): String {
+        var cleaned = response
+            .replace(Regex("```json\\s*"), "")  // Remove ```json
+            .replace(Regex("```\\s*"), "")       // Remove ```
+            .replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "") // Remove <think> blocks
+            .trim()
+        
+        // Find the JSON object boundaries
+        val jsonStart = cleaned.indexOf('{')
+        val jsonEnd = cleaned.lastIndexOf('}')
+        
+        if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
+            cleaned = cleaned.substring(jsonStart, jsonEnd + 1)
+        }
+        
+        return cleaned
+    }
+
+    /**
+     * Extracts text from a PDF file using PDFBox.
+     */
+    private fun extractTextFromPdf(context: Context, uri: Uri): String {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val document = PDDocument.load(inputStream)
+                val stripper = PDFTextStripper()
+                
+                // Extract text page by page with logging
+                val text = stripper.getText(document)
+                Log.d(TAG, "PDF loaded successfully. Pages: ${document.numberOfPages}")
+                
+                document.close()
+                text
+            } ?: run {
+                Log.e(TAG, "Could not open input stream for URI: $uri")
+                ""
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "PDF read error: ${e.message}", e)
+            ""
+        }
+    }
+}

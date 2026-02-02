@@ -1,3 +1,5 @@
+import java.util.Properties
+import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,10 +7,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") // NEW: Add this to enable serialization support
     id("com.google.devtools.ksp") version "2.3.0"
 }
-
+val envProperties = Properties()
+val envFile = rootProject.file(".env")
+if (envFile.exists()) {
+    envProperties.load(FileInputStream(envFile))
+}
 android {
     namespace = "com.swipeapply.app"
-    compileSdk = 36 // As per your recent update
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.swipeapply.app"
@@ -17,31 +23,41 @@ android {
         versionCode = 2
         versionName = "1.1"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val geminiKey = envProperties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"$geminiKey\""
+        )
+        
+        // OpenRouter API Key for AI resume parsing
+        val openRouterKey = envProperties.getProperty("OPENROUTER_API_KEY") ?: ""
+        buildConfigField(
+            "String",
+            "OPENROUTER_API_KEY",
+            "\"$openRouterKey\""
+        )
     }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
+    buildFeatures {
+        compose = true
+        buildConfig = true   
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        compilerOptions {
+            jvmTarget.set(
+                org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+            )
+        }
     }
 }
-    buildFeatures {
-        compose = true
-    }
-}
+
 
 dependencies {
     // Core Android
@@ -84,6 +100,10 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt") // Optional: For fetching user profiles if needed
     implementation("io.ktor:ktor-client-cio:3.0.0")
+    implementation("io.ktor:ktor-client-core:3.0.0")
+    implementation("io.ktor:ktor-client-okhttp:3.0.0")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0")
     implementation("androidx.browser:browser:1.9.0")
     
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -92,7 +112,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     
     // Room Database
-    val room_version = "2.7.0-alpha11" // Or try "2.7.0-rc01" if available
+    val room_version = "2.7.0-alpha11" 
     
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
@@ -105,4 +125,12 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // PDFBox for PDF text extraction
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    
+    // Kotlin Serialization (for parsing AI JSON response)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    
+    // Note: OpenRouter uses OkHttp (already included above) for HTTP calls
 }

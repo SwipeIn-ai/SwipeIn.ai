@@ -18,6 +18,7 @@ import com.swipeapply.app.ui.theme.SwipeApplyTheme
 import com.swipeapply.app.SupabaseClient
 import kotlinx.coroutines.delay
 import io.github.jan.supabase.auth.handleDeeplinks
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +29,7 @@ class MainActivity : ComponentActivity() {
         if (currentIntent != null) {
             SupabaseClient.client.handleDeeplinks(currentIntent)
         }
-
+        PDFBoxResourceLoader.init(applicationContext)
         setContent {
             val darkModeEnabled = rememberSaveable { mutableStateOf<Boolean?>(null) }
 
