@@ -35,15 +35,32 @@ interface JobDao {
     @Query("DELETE FROM jobs WHERE fetchedAt < :timestamp")
     suspend fun deleteOldJobs(timestamp: Long)
 
-    @Query("SELECT jobId FROM swiped_jobs")
+    // ===== USER-AWARE SWIPE TRACKING =====
+    
+    /** Get all job IDs swiped by a specific user */
+    @Query("SELECT jobId FROM swiped_jobs WHERE userId = :userId")
+    suspend fun getSwipedJobIdsByUser(userId: String): List<String>
+    
+    /** Legacy: Get ALL swiped job IDs (for backward compatibility during migration) */
+    @Query("SELECT DISTINCT jobId FROM swiped_jobs")
     suspend fun getAllSwipedJobIds(): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSwipedJob(swipedJob: SwipedJobEntity)
 
+    /** Clear swipe history for a specific user only */
+    @Query("DELETE FROM swiped_jobs WHERE userId = :userId")
+    suspend fun deleteSwipedJobsByUser(userId: String)
+    
+    /** Legacy: Clear ALL swipe history (destructive) */
     @Query("DELETE FROM swiped_jobs")
     suspend fun deleteAllSwipedJobs()
 
+    /** Get jobs not swiped by a specific user */
+    @Query("SELECT * FROM jobs WHERE id NOT IN (SELECT jobId FROM swiped_jobs WHERE userId = :userId) ORDER BY fetchedAt DESC")
+    suspend fun getAvailableJobsForUser(userId: String): List<JobEntity>
+    
+    /** Legacy: Get jobs not swiped by anyone (backward compatibility) */
     @Query("SELECT * FROM jobs WHERE id NOT IN (SELECT jobId FROM swiped_jobs) ORDER BY fetchedAt DESC")
     suspend fun getAvailableJobs(): List<JobEntity>
 }

@@ -23,6 +23,10 @@ class ViewModelFactory(
                 HomeViewModel(application) as T
             }
 
+            modelClass.isAssignableFrom(ProfileViewModel::class.java) -> {
+                ProfileViewModel(application) as T
+            }
+
             else -> throw IllegalArgumentException(
                 "Unknown ViewModel class: ${modelClass.name}"
             )
