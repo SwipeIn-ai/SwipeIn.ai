@@ -45,6 +45,24 @@ data class SupabaseProfileData(
 class JobRepository(private val context: Context, private val apiKey: String) {
 
     private val jobDao = SwipeApplyDatabase.getDatabase(context).jobDao()
+    
+    // Current user ID for user-specific swipe tracking
+    // Defaults to "local_user" for dev mode (skip login)
+    private var currentUserId: String = "local_user"
+    
+    /**
+     * Set the current user ID. Call this after authentication.
+     * For dev mode / skip login, this defaults to "local_user".
+     */
+    fun setCurrentUser(userId: String?) {
+        currentUserId = userId ?: "local_user"
+        Log.d(TAG, "Current user set to: $currentUserId")
+    }
+    
+    /**
+     * Get current user ID (for external access if needed)
+     */
+    fun getCurrentUserId(): String = currentUserId
 
     private val apiService: FindWorkApiService by lazy {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
@@ -153,7 +171,8 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         isFetching = true
         
         val authToken = FindWorkApiService.formatAuthToken(apiKey)
-        val swipedIds = jobDao.getAllSwipedJobIds().toSet()
+        // Use user-specific swiped IDs
+        val swipedIds = jobDao.getSwipedJobIdsByUser(currentUserId).toSet()
 
         try {
             while (hasMorePages && jobQueue.size < 20) {
@@ -209,7 +228,8 @@ class JobRepository(private val context: Context, private val apiKey: String) {
      * Load unswiped jobs from Local DB into the Queue
      */
     private suspend fun loadFromDatabaseFallback() {
-        val dbJobs = jobDao.getAvailableJobs() // Uses the new NOT IN query
+        // Use user-specific query
+        val dbJobs = jobDao.getAvailableJobsForUser(currentUserId)
         
         val newCards = dbJobs.mapNotNull { 
             try { it.toJobCard() } catch(e: Exception) { null } 
@@ -218,7 +238,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         }
 
         if (newCards.isNotEmpty()) {
-            Log.d(TAG, "Loaded ${newCards.size} jobs from Offline Database")
+            Log.d(TAG, "Loaded ${newCards.size} jobs from Offline Database for user: $currentUserId")
             // Add to front of queue to show immediately
             newCards.forEach { 
                 if (!queuedJobIds.contains(it.id)) {
@@ -227,12 +247,15 @@ class JobRepository(private val context: Context, private val apiKey: String) {
                 }
             }
         } else {
-            Log.w(TAG, "Database is empty or all jobs swiped.")
+            Log.w(TAG, "Database is empty or all jobs swiped by user: $currentUserId")
         }
     }
 
     suspend fun recordSwipe(jobId: String, direction: String) = withContext(Dispatchers.IO) {
-        try { jobDao.insertSwipedJob(SwipedJobEntity(jobId, direction)) } 
+        try { 
+            // Include userId in the swipe record
+            jobDao.insertSwipedJob(SwipedJobEntity(jobId = jobId, userId = currentUserId, direction = direction)) 
+        } 
         catch (e: Exception) { Log.e(TAG, "DB Error: ${e.message}") }
     }
 
@@ -245,8 +268,21 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     }
     
     suspend fun clearSwipeHistory() = withContext(Dispatchers.IO) {
-        jobDao.deleteAllSwipedJobs()
+        // Clear only for current user (user-specific)
+        jobDao.deleteSwipedJobsByUser(currentUserId)
         clearCache()
+        Log.d(TAG, "Cleared swipe history for user: $currentUserId")
+    }
+    
+    /**
+     * Clear ALL local data on logout.
+     * Resets queue, cache, and user ID to default.
+     */
+    suspend fun clearAllLocalData() = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Clearing all local data for user: $currentUserId")
+        jobDao.deleteSwipedJobsByUser(currentUserId)
+        clearCache()
+        currentUserId = "local_user" // Reset to default
     }
 
     suspend fun refreshJobs(search: String?, location: String?, remote: Boolean?): Result<List<JobCard>> {

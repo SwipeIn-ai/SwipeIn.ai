@@ -18,6 +18,7 @@ import com.swipeapply.app.ui.screens.HomeScreen
 import com.swipeapply.app.ui.screens.IntroTemplateScreen
 import com.swipeapply.app.ui.screens.OnboardingScreen
 import com.swipeapply.app.ui.screens.ProfileCreationScreen
+import com.swipeapply.app.ui.screens.ProfileScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -29,6 +30,7 @@ sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object ProfileCreation : Screen("profile_creation")
     object Home : Screen("home")
+    object Profile : Screen("profile")
     object IntroTemplate : Screen("intro_template/{jobId}") {
         fun createRoute(jobId: String) = "intro_template/$jobId"
     }
@@ -154,6 +156,10 @@ fun SwipeApplyNavHost(
                 },
                 onDarkModeToggle = onDarkModeToggle,
                 isDarkModeEnabled = isDarkModeEnabled,
+                // Navigate to Profile screen
+                onNavigateToProfile = {
+                    navController.navigate(Screen.Profile.route)
+                },
                 // NEW: Handle sign out navigation
                 onSignOutSuccess = {
                     navController.navigate(Screen.Onboarding.route) {
@@ -165,6 +171,15 @@ fun SwipeApplyNavHost(
                     }
                 }
 
+            )
+        }
+        
+        // Profile screen (view/edit user profile)
+        composable(route = Screen.Profile.route) {
+            ProfileScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
         

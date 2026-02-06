@@ -4,16 +4,24 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.data.model.SwipeResult
+import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.repository.JobRepository
+import com.swipeapply.app.data.service.JobRankingService
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.from
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlin.math.min
 
 private const val TAG = "HomeViewModel"
@@ -43,7 +51,11 @@ data class HomeUiState(
     val canUndo: Boolean = false,
     val error: String? = null,
     val hasMorePages: Boolean = true,
-    val totalJobs: Int = 0
+    val totalJobs: Int = 0,
+    // AI Ranking state
+    val isAiSortEnabled: Boolean = true,
+    val isRanking: Boolean = false,
+    val userProfile: UserProfile? = null
 )
 
 /**
@@ -60,8 +72,84 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private val jsonParser = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+    }
+
     init {
+        // Try to set current user from Supabase auth
+        initializeCurrentUser()
+        // Fetch user profile for AI ranking
+        fetchUserProfileForRanking()
         loadCards()
+    }
+    
+    /**
+     * Initialize current user ID from Supabase auth (if logged in)
+     */
+    private fun initializeCurrentUser() {
+        try {
+            val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+            repository.setCurrentUser(userId)
+            Log.d(TAG, "Initialized user: ${userId ?: "local_user (dev mode)"}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not get current user, using local_user: ${e.message}")
+            repository.setCurrentUser(null)
+        }
+    }
+
+    /**
+     * Fetch user profile from Supabase for AI ranking
+     */
+    private fun fetchUserProfileForRanking() {
+        viewModelScope.launch {
+            try {
+                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+                if (userId == null) {
+                    Log.d(TAG, "No user logged in, AI ranking will use basic sorting")
+                    return@launch
+                }
+
+                val profile = fetchProfileFromSupabase(userId)
+                if (profile != null) {
+                    _uiState.update { it.copy(userProfile = profile) }
+                    Log.d(TAG, "Loaded user profile for AI ranking: ${profile.fullName}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not fetch profile for AI ranking: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun fetchProfileFromSupabase(userId: String): UserProfile? = withContext(Dispatchers.IO) {
+        try {
+            val response = SupabaseClient.client
+                .from("profiles")
+                .select { filter { eq("id", userId) } }
+
+            val data = response.data
+            if (data == "[]" || data.isNullOrEmpty()) return@withContext null
+
+            val profiles = jsonParser.decodeFromString<List<ProfileResponse>>(data)
+            val profileData = profiles.firstOrNull() ?: return@withContext null
+
+            return@withContext UserProfile(
+                fullName = profileData.full_name ?: "",
+                email = profileData.email ?: "",
+                phone = profileData.phone ?: "",
+                bio = profileData.bio ?: "",
+                skills = profileData.skills ?: emptyList(),
+                techStack = profileData.tech_stack ?: emptyList(),
+                education = profileData.education ?: emptyList(),
+                experience = profileData.experience ?: emptyList(),
+                projects = profileData.projects ?: emptyList()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching profile: ${e.message}")
+            return@withContext null
+        }
     }
 
     /**
@@ -81,14 +169,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     result.fold(
                         onSuccess = { cards ->
                             Log.d(TAG, "loadCards() - SUCCESS: Got ${cards.size} cards")
+                            
+                            // Apply AI ranking if enabled and profile exists
+                            val sortedCards = applyAiRankingIfEnabled(cards)
+                            
                             _uiState.update {
                                 it.copy(
-                                    cards = cards,
+                                    cards = sortedCards,
                                     isLoading = false,
-                                    isEmpty = cards.isEmpty(),
+                                    isEmpty = sortedCards.isEmpty(),
                                     error = null,
-                                    hasMorePages = true, // Reset assumption
-                                    totalJobs = repository.getTotalCount() // Optional: might not be accurate with filter
+                                    hasMorePages = true,
+                                    totalJobs = repository.getTotalCount()
                                 )
                             }
                         },
@@ -114,6 +206,69 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Apply AI ranking to jobs if enabled and user profile exists
+     */
+    private suspend fun applyAiRankingIfEnabled(jobs: List<JobCard>): List<JobCard> {
+        val state = _uiState.value
+        
+        if (!state.isAiSortEnabled) {
+            Log.d(TAG, "AI sorting is disabled")
+            return jobs
+        }
+
+        val profile = state.userProfile
+        if (profile == null) {
+            Log.d(TAG, "No user profile, using quick match scoring")
+            // Use quick local matching as fallback
+            return jobs.sortedByDescending { job ->
+                JobRankingService.quickMatchScore(job, UserProfile())
+            }
+        }
+
+        // Check if profile has enough data for AI ranking
+        if (profile.techStack.isEmpty() && profile.skills.isEmpty() && profile.bio.isEmpty()) {
+            Log.d(TAG, "Profile is empty, skipping AI ranking")
+            return jobs
+        }
+
+        _uiState.update { it.copy(isRanking = true) }
+        
+        return try {
+            Log.d(TAG, "Applying AI ranking to ${jobs.size} jobs...")
+            val rankedJobs = JobRankingService.rankJobs(jobs, profile)
+            Log.d(TAG, "AI ranking complete")
+            rankedJobs
+        } catch (e: Exception) {
+            Log.e(TAG, "AI ranking failed: ${e.message}", e)
+            jobs // Return original order on failure
+        } finally {
+            _uiState.update { it.copy(isRanking = false) }
+        }
+    }
+
+    /**
+     * Toggle AI sorting on/off
+     */
+    fun toggleAiSort() {
+        _uiState.update { it.copy(isAiSortEnabled = !it.isAiSortEnabled) }
+        // Reload cards with new sorting preference
+        loadCards()
+    }
+
+    /**
+     * Manually trigger AI re-ranking of current cards
+     */
+    fun reRankJobs() {
+        viewModelScope.launch {
+            val currentCards = _uiState.value.cards
+            if (currentCards.isEmpty()) return@launch
+            
+            val rankedCards = applyAiRankingIfEnabled(currentCards)
+            _uiState.update { it.copy(cards = rankedCards) }
         }
     }
 
@@ -284,8 +439,9 @@ fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
     fun performSignOut() {
         viewModelScope.launch {
             // WIPE ALL DATA so the next user (or same user) gets a fresh start
-            repository.clearSwipeHistory()
+            repository.clearAllLocalData()
             _uiState.update { HomeUiState() } // Reset UI state
+            Log.d(TAG, "Sign out complete - local data cleared")
         }
     }
     fun debugClearHistory() {
@@ -303,4 +459,21 @@ data class SwipeStats(
     val skipped: Int,
     val remaining: Int,
     val undoCount: Int
+)
+
+/**
+ * Response model for Supabase profile fetch (used internally by HomeViewModel)
+ */
+@kotlinx.serialization.Serializable
+private data class ProfileResponse(
+    val id: String,
+    val full_name: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    val bio: String? = null,
+    val skills: List<String>? = null,
+    val tech_stack: List<String>? = null,
+    val education: List<com.swipeapply.app.data.model.EducationItem>? = null,
+    val experience: List<com.swipeapply.app.data.model.ExperienceItem>? = null,
+    val projects: List<com.swipeapply.app.data.model.ProjectItem>? = null
 )

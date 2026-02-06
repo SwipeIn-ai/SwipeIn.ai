@@ -16,11 +16,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -65,6 +67,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null,
+    onNavigateToProfile: () -> Unit = {},
     onSignOutSuccess: () -> Unit // From Auth changes
 ) {
     // --- 1. ViewModel Setup (From Job API changes) ---
@@ -141,7 +144,9 @@ val viewModel: HomeViewModel = viewModel(
                 onSignOut = {
                     scope.launch {
                         try {
-                            // Explicitly sign out locally
+                            // Clear local data BEFORE signing out
+                            viewModel.performSignOut()
+                            // Explicitly sign out from Supabase
                             supabase.auth.signOut(scope = SignOutScope.LOCAL)
                             delay(250L)
                         } catch (e: Exception) {
@@ -151,7 +156,13 @@ val viewModel: HomeViewModel = viewModel(
                             onSignOutSuccess()
                         }
                     }
-                }
+                },
+                // Profile navigation
+                onNavigateToProfile = onNavigateToProfile,
+                // AI Sort toggle
+                isAiSortEnabled = uiState.isAiSortEnabled,
+                onToggleAiSort = { viewModel.toggleAiSort() },
+                isRanking = uiState.isRanking
             )
 
             // Card stack area (Combined Logic)
@@ -313,7 +324,11 @@ private fun HomeTopBar(
     onUndoLongPress: () -> Unit,
     isDarkMode: Boolean? = null,
     onDarkModeToggle: (Boolean?) -> Unit = {},
-    onSignOut: () -> Unit // Added from Auth changes
+    onSignOut: () -> Unit,
+    onNavigateToProfile: () -> Unit = {},
+    isAiSortEnabled: Boolean = true,
+    onToggleAiSort: () -> Unit = {},
+    isRanking: Boolean = false
 ) {
     Surface(
         color = BackgroundLight,
@@ -406,6 +421,32 @@ private fun HomeTopBar(
                             null -> Icons.Default.DarkMode
                         },
                         contentDescription = "Toggle dark mode",
+                        tint = TextSecondary
+                    )
+                }
+
+                // AI Sort toggle button
+                IconButton(onClick = onToggleAiSort) {
+                    if (isRanking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Primary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = if (isAiSortEnabled) "AI Sort On" else "AI Sort Off",
+                            tint = if (isAiSortEnabled) Primary else TextSecondary
+                        )
+                    }
+                }
+
+                // Profile Button
+                IconButton(onClick = onNavigateToProfile) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "My Profile",
                         tint = TextSecondary
                     )
                 }
