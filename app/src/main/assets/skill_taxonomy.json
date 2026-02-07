@@ -1,0 +1,475 @@
+{
+    "domains": {
+        "web": {
+            "categories": {
+                "frontend-frameworks": {
+                    "subcategories": {
+                        "react-ecosystem": [
+                            "react",
+                            "next.js",
+                            "gatsby",
+                            "redux",
+                            "react query",
+                            "react router",
+                            "zustand",
+                            "recoil"
+                        ],
+                        "vue-ecosystem": [
+                            "vue.js",
+                            "nuxt.js",
+                            "vuex",
+                            "pinia",
+                            "vue router"
+                        ],
+                        "angular-ecosystem": [
+                            "angular",
+                            "rxjs",
+                            "ngrx",
+                            "angular material"
+                        ],
+                        "svelte-ecosystem": [
+                            "svelte",
+                            "sveltekit"
+                        ]
+                    }
+                },
+                "frontend": {
+                    "subcategories": {
+                        "frontend-core": [
+                            "javascript",
+                            "typescript",
+                            "html",
+                            "css"
+                        ],
+                        "styling": [
+                            "sass",
+                            "tailwind",
+                            "styled-components",
+                            "bootstrap",
+                            "material-ui"
+                        ]
+                    }
+                },
+                "backend-frameworks": {
+                    "subcategories": {
+                        "nodejs-ecosystem": [
+                            "node.js",
+                            "express",
+                            "nestjs",
+                            "fastify",
+                            "koa",
+                            "hapi"
+                        ],
+                        "python-web": [
+                            "django",
+                            "flask",
+                            "fastapi",
+                            "tornado",
+                            "celery"
+                        ],
+                        "jvm-web": [
+                            "spring",
+                            "spring boot",
+                            "micronaut",
+                            "quarkus",
+                            "ktor",
+                            "dropwizard"
+                        ],
+                        "go-ecosystem": [
+                            "go",
+                            "gin",
+                            "echo",
+                            "fiber",
+                            "chi"
+                        ],
+                        "ruby-ecosystem": [
+                            "ruby",
+                            "rails",
+                            "sinatra",
+                            "hanami"
+                        ],
+                        "php-ecosystem": [
+                            "php",
+                            "laravel",
+                            "symfony",
+                            "codeigniter"
+                        ],
+                        "dotnet-ecosystem": [
+                            "c#",
+                            "asp.net",
+                            ".net core",
+                            "blazor"
+                        ]
+                    }
+                },
+                "api": {
+                    "subcategories": {
+                        "api-protocols": [
+                            "rest api",
+                            "graphql",
+                            "grpc",
+                            "websocket",
+                            "soap"
+                        ]
+                    }
+                }
+            }
+        },
+        "mobile": {
+            "categories": {
+                "mobile-native": {
+                    "subcategories": {
+                        "android-native": [
+                            "android",
+                            "kotlin",
+                            "jetpack compose",
+                            "android studio",
+                            "gradle"
+                        ],
+                        "ios-native": [
+                            "ios",
+                            "swift",
+                            "swiftui",
+                            "uikit",
+                            "xcode",
+                            "cocoapods"
+                        ]
+                    }
+                },
+                "mobile-frameworks": {
+                    "subcategories": {
+                        "mobile-crossplatform": [
+                            "react native",
+                            "flutter",
+                            "dart",
+                            "xamarin",
+                            "kotlin multiplatform",
+                            "ionic"
+                        ]
+                    }
+                }
+            }
+        },
+        "data": {
+            "categories": {
+                "databases": {
+                    "subcategories": {
+                        "sql-databases": [
+                            "postgresql",
+                            "mysql",
+                            "sql server",
+                            "oracle",
+                            "sqlite",
+                            "mariadb"
+                        ],
+                        "nosql-databases": [
+                            "mongodb",
+                            "redis",
+                            "cassandra",
+                            "dynamodb",
+                            "couchbase",
+                            "firebase"
+                        ],
+                        "graph-databases": [
+                            "neo4j",
+                            "arangodb",
+                            "amazon neptune"
+                        ],
+                        "timeseries-databases": [
+                            "influxdb",
+                            "timescaledb",
+                            "prometheus"
+                        ]
+                    }
+                },
+                "data-tools": {
+                    "subcategories": {
+                        "search-engines": [
+                            "elasticsearch",
+                            "solr",
+                            "opensearch",
+                            "algolia",
+                            "meilisearch"
+                        ],
+                        "message-queues": [
+                            "kafka",
+                            "rabbitmq",
+                            "sqs",
+                            "redis",
+                            "pulsar"
+                        ]
+                    }
+                },
+                "data-engineering": {
+                    "subcategories": {
+                        "data-processing": [
+                            "apache spark",
+                            "flink",
+                            "airflow",
+                            "dbt",
+                            "dagster"
+                        ],
+                        "data-warehouses": [
+                            "snowflake",
+                            "redshift",
+                            "bigquery",
+                            "databricks"
+                        ]
+                    }
+                }
+            }
+        },
+        "devops": {
+            "categories": {
+                "containerization": {
+                    "subcategories": {
+                        "containers": [
+                            "docker",
+                            "podman",
+                            "containerd",
+                            "buildah"
+                        ],
+                        "orchestration": [
+                            "kubernetes",
+                            "docker swarm",
+                            "nomad",
+                            "openshift",
+                            "rancher"
+                        ]
+                    }
+                },
+                "cicd": {
+                    "subcategories": {
+                        "cicd-tools": [
+                            "jenkins",
+                            "github actions",
+                            "gitlab ci",
+                            "circleci",
+                            "travis ci",
+                            "azure devops",
+                            "argocd"
+                        ]
+                    }
+                },
+                "infrastructure": {
+                    "subcategories": {
+                        "infrastructure-as-code": [
+                            "terraform",
+                            "pulumi",
+                            "cloudformation",
+                            "cdk",
+                            "crossplane"
+                        ],
+                        "configuration-management": [
+                            "ansible",
+                            "chef",
+                            "puppet",
+                            "saltstack"
+                        ]
+                    }
+                },
+                "monitoring": {
+                    "subcategories": {
+                        "observability": [
+                            "prometheus",
+                            "grafana",
+                            "datadog",
+                            "newrelic",
+                            "dynatrace",
+                            "splunk"
+                        ],
+                        "logging": [
+                            "elk stack",
+                            "loki",
+                            "fluentd",
+                            "vector"
+                        ]
+                    }
+                }
+            }
+        },
+        "cloud": {
+            "categories": {
+                "cloud-providers": {
+                    "subcategories": {
+                        "aws-services": [
+                            "aws",
+                            "ec2",
+                            "s3",
+                            "lambda",
+                            "rds",
+                            "dynamodb",
+                            "eks",
+                            "ecs",
+                            "sqs",
+                            "sns"
+                        ],
+                        "gcp-services": [
+                            "gcp",
+                            "compute engine",
+                            "cloud storage",
+                            "cloud functions",
+                            "gke",
+                            "bigquery",
+                            "pubsub"
+                        ],
+                        "azure-services": [
+                            "azure",
+                            "azure functions",
+                            "blob storage",
+                            "cosmos db",
+                            "aks",
+                            "azure sql",
+                            "service bus"
+                        ]
+                    }
+                },
+                "serverless": {
+                    "subcategories": {
+                        "serverless-compute": [
+                            "lambda",
+                            "cloud functions",
+                            "azure functions",
+                            "cloudflare workers",
+                            "vercel",
+                            "netlify"
+                        ]
+                    }
+                }
+            }
+        },
+        "ml-ai": {
+            "categories": {
+                "machine-learning": {
+                    "subcategories": {
+                        "ml-frameworks": [
+                            "tensorflow",
+                            "pytorch",
+                            "keras",
+                            "scikit-learn",
+                            "xgboost",
+                            "lightgbm",
+                            "catboost"
+                        ],
+                        "deep-learning": [
+                            "deep learning",
+                            "neural networks",
+                            "cnn",
+                            "rnn",
+                            "transformer",
+                            "attention"
+                        ]
+                    }
+                },
+                "ai-domains": {
+                    "subcategories": {
+                        "nlp": [
+                            "nlp",
+                            "huggingface",
+                            "bert",
+                            "gpt",
+                            "langchain",
+                            "llm",
+                            "transformers",
+                            "spacy"
+                        ],
+                        "computer-vision": [
+                            "computer vision",
+                            "opencv",
+                            "yolo",
+                            "image classification",
+                            "object detection"
+                        ],
+                        "llm-ops": [
+                            "langchain",
+                            "llamaindex",
+                            "vector databases",
+                            "embeddings",
+                            "rag"
+                        ]
+                    }
+                },
+                "ml-infrastructure": {
+                    "subcategories": {
+                        "mlops": [
+                            "mlflow",
+                            "kubeflow",
+                            "sagemaker",
+                            "vertex ai",
+                            "weights & biases",
+                            "neptune"
+                        ]
+                    }
+                },
+                "data-science": {
+                    "subcategories": {
+                        "data-science-tools": [
+                            "pandas",
+                            "numpy",
+                            "matplotlib",
+                            "seaborn",
+                            "jupyter",
+                            "scipy",
+                            "polars"
+                        ]
+                    }
+                }
+            }
+        },
+        "security": {
+            "categories": {
+                "security-tools": {
+                    "subcategories": {
+                        "security-practices": [
+                            "owasp",
+                            "penetration testing",
+                            "security auditing",
+                            "sast",
+                            "dast"
+                        ],
+                        "identity": [
+                            "oauth",
+                            "jwt",
+                            "saml",
+                            "openid connect",
+                            "auth0",
+                            "keycloak"
+                        ]
+                    }
+                }
+            }
+        },
+        "systems": {
+            "categories": {
+                "systems-programming": {
+                    "subcategories": {
+                        "low-level": [
+                            "c",
+                            "c++",
+                            "rust",
+                            "assembly"
+                        ],
+                        "embedded": [
+                            "embedded systems",
+                            "microcontrollers",
+                            "arduino",
+                            "raspberry pi",
+                            "rtos"
+                        ]
+                    }
+                },
+                "operating-systems": {
+                    "subcategories": {
+                        "linux-unix": [
+                            "linux",
+                            "unix",
+                            "bash",
+                            "shell scripting",
+                            "systemd"
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}

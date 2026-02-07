@@ -52,8 +52,8 @@ data class HomeUiState(
     val error: String? = null,
     val hasMorePages: Boolean = true,
     val totalJobs: Int = 0,
-    // AI Ranking state
-    val isAiSortEnabled: Boolean = true,
+    // Deterministic Ranking state (NO AI in ranking)
+    val isRankingEnabled: Boolean = true,
     val isRanking: Boolean = false,
     val userProfile: UserProfile? = null
 )
@@ -61,6 +61,9 @@ data class HomeUiState(
 /**
  * ViewModel for the Home/Swipe screen.
  * Manages card stack state and swipe actions.
+ * 
+ * IMPORTANT: Job ranking is DETERMINISTIC (rule-based).
+ * AI is ONLY used for generating "Why this job?" explanations.
  */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -79,9 +82,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        // Initialize the deterministic ranking engine
+        JobRankingService.initialize(application.applicationContext)
         // Try to set current user from Supabase auth
         initializeCurrentUser()
-        // Fetch user profile for AI ranking
+        // Fetch user profile for ranking
         fetchUserProfileForRanking()
         loadCards()
     }
@@ -101,21 +106,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Fetch user profile from Supabase for AI ranking
+     * Fetch user profile from Supabase for deterministic ranking
      */
     private fun fetchUserProfileForRanking() {
         viewModelScope.launch {
             try {
                 val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
                 if (userId == null) {
-                    Log.d(TAG, "No user logged in, AI ranking will use basic sorting")
+                    Log.d(TAG, "No user logged in, ranking will use basic sorting")
                     return@launch
                 }
 
                 val profile = fetchProfileFromSupabase(userId)
                 if (profile != null) {
                     _uiState.update { it.copy(userProfile = profile) }
-                    Log.d(TAG, "Loaded user profile for AI ranking: ${profile.fullName}")
+                    Log.d(TAG, "Loaded user profile for ranking: ${profile.fullName}")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not fetch profile for AI ranking: ${e.message}")
@@ -171,7 +176,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             Log.d(TAG, "loadCards() - SUCCESS: Got ${cards.size} cards")
                             
                             // Apply AI ranking if enabled and profile exists
-                            val sortedCards = applyAiRankingIfEnabled(cards)
+                            val sortedCards = applyRankingIfEnabled(cards)
                             
                             _uiState.update {
                                 it.copy(
@@ -210,13 +215,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Apply AI ranking to jobs if enabled and user profile exists
+     * Apply DETERMINISTIC ranking to jobs if enabled and user profile exists.
+     * 
+     * NOTE: This uses a rule-based ranking algorithm, NOT AI.
+     * The ranking formula:
+     * - 50% Skill Match
+     * - 25% Experience Match
+     * - 15% Role Alignment
+     * - 10% Tech Stack Depth
      */
-    private suspend fun applyAiRankingIfEnabled(jobs: List<JobCard>): List<JobCard> {
+    private suspend fun applyRankingIfEnabled(jobs: List<JobCard>): List<JobCard> {
         val state = _uiState.value
         
-        if (!state.isAiSortEnabled) {
-            Log.d(TAG, "AI sorting is disabled")
+        if (!state.isRankingEnabled) {
+            Log.d(TAG, "Ranking is disabled")
             return jobs
         }
 
@@ -229,21 +241,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Check if profile has enough data for AI ranking
-        if (profile.techStack.isEmpty() && profile.skills.isEmpty() && profile.bio.isEmpty()) {
-            Log.d(TAG, "Profile is empty, skipping AI ranking")
+        // Check if profile has enough data for ranking
+        if (profile.techStack.isEmpty() && profile.skills.isEmpty()) {
+            Log.d(TAG, "Profile is empty, skipping ranking")
             return jobs
         }
 
         _uiState.update { it.copy(isRanking = true) }
         
         return try {
-            Log.d(TAG, "Applying AI ranking to ${jobs.size} jobs...")
+            Log.d(TAG, "Applying deterministic ranking to ${jobs.size} jobs...")
             val rankedJobs = JobRankingService.rankJobs(jobs, profile)
-            Log.d(TAG, "AI ranking complete")
+            Log.d(TAG, "Deterministic ranking complete")
             rankedJobs
         } catch (e: Exception) {
-            Log.e(TAG, "AI ranking failed: ${e.message}", e)
+            Log.e(TAG, "Ranking failed: ${e.message}", e)
             jobs // Return original order on failure
         } finally {
             _uiState.update { it.copy(isRanking = false) }
@@ -251,23 +263,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Toggle AI sorting on/off
+     * Toggle deterministic ranking on/off
      */
-    fun toggleAiSort() {
-        _uiState.update { it.copy(isAiSortEnabled = !it.isAiSortEnabled) }
+    fun toggleRanking() {
+        _uiState.update { it.copy(isRankingEnabled = !it.isRankingEnabled) }
         // Reload cards with new sorting preference
         loadCards()
     }
 
     /**
-     * Manually trigger AI re-ranking of current cards
+     * Manually trigger re-ranking of current cards (DETERMINISTIC - NO AI)
      */
     fun reRankJobs() {
         viewModelScope.launch {
             val currentCards = _uiState.value.cards
             if (currentCards.isEmpty()) return@launch
             
-            val rankedCards = applyAiRankingIfEnabled(currentCards)
+            val rankedCards = applyRankingIfEnabled(currentCards)
             _uiState.update { it.copy(cards = rankedCards) }
         }
     }
