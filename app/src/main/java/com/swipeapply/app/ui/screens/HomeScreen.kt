@@ -159,9 +159,9 @@ val viewModel: HomeViewModel = viewModel(
                 },
                 // Profile navigation
                 onNavigateToProfile = onNavigateToProfile,
-                // AI Sort toggle
-                isAiSortEnabled = uiState.isAiSortEnabled,
-                onToggleAiSort = { viewModel.toggleAiSort() },
+                // Ranking toggle (deterministic, not AI)
+                isRankingEnabled = uiState.isRankingEnabled,
+                onToggleRanking = { viewModel.toggleRanking() },
                 isRanking = uiState.isRanking
             )
 
@@ -326,8 +326,8 @@ private fun HomeTopBar(
     onDarkModeToggle: (Boolean?) -> Unit = {},
     onSignOut: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
-    isAiSortEnabled: Boolean = true,
-    onToggleAiSort: () -> Unit = {},
+    isRankingEnabled: Boolean = true,
+    onToggleRanking: () -> Unit = {},
     isRanking: Boolean = false
 ) {
     Surface(
@@ -425,8 +425,8 @@ private fun HomeTopBar(
                     )
                 }
 
-                // AI Sort toggle button
-                IconButton(onClick = onToggleAiSort) {
+                // Ranking toggle button (deterministic ranking)
+                IconButton(onClick = onToggleRanking) {
                     if (isRanking) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
@@ -436,8 +436,8 @@ private fun HomeTopBar(
                     } else {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = if (isAiSortEnabled) "AI Sort On" else "AI Sort Off",
-                            tint = if (isAiSortEnabled) Primary else TextSecondary
+                            contentDescription = if (isRankingEnabled) "Ranking On" else "Ranking Off",
+                            tint = if (isRankingEnabled) Primary else TextSecondary
                         )
                     }
                 }
