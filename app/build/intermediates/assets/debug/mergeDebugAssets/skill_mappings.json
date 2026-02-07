@@ -1,0 +1,411 @@
+{
+    "aliases": {
+        "javascript": [
+            "js",
+            "ecmascript",
+            "es6",
+            "es2015",
+            "es2020",
+            "es2021",
+            "es2022"
+        ],
+        "typescript": [
+            "ts",
+            "tsx"
+        ],
+        "node.js": [
+            "node",
+            "nodejs",
+            "node js",
+            "node.js"
+        ],
+        "react": [
+            "reactjs",
+            "react.js",
+            "react js",
+            "react 18"
+        ],
+        "vue.js": [
+            "vue",
+            "vuejs",
+            "vue js",
+            "vue 3",
+            "vue2",
+            "vue3"
+        ],
+        "angular": [
+            "angularjs",
+            "angular.js",
+            "angular 2+",
+            "angular 15",
+            "angular 16"
+        ],
+        "next.js": [
+            "next",
+            "nextjs",
+            "next js",
+            "next 13",
+            "next 14"
+        ],
+        "nuxt.js": [
+            "nuxt",
+            "nuxtjs",
+            "nuxt 3"
+        ],
+        "svelte": [
+            "sveltekit",
+            "svelte kit"
+        ],
+        "python": [
+            "py",
+            "python3",
+            "python 3",
+            "python3.x"
+        ],
+        "django": [
+            "django rest",
+            "drf",
+            "django rest framework"
+        ],
+        "flask": [
+            "flask-restful",
+            "flask restful"
+        ],
+        "fastapi": [
+            "fast api",
+            "fast-api"
+        ],
+        "kotlin": [
+            "kt",
+            "kotlin/jvm"
+        ],
+        "java": [
+            "java 8",
+            "java 11",
+            "java 17",
+            "java 21",
+            "jdk",
+            "jre"
+        ],
+        "spring": [
+            "spring boot",
+            "springboot",
+            "spring framework",
+            "spring mvc"
+        ],
+        "go": [
+            "golang",
+            "go-lang",
+            "go lang"
+        ],
+        "rust": [
+            "rust-lang",
+            "rustlang"
+        ],
+        "c++": [
+            "cpp",
+            "c plus plus",
+            "cplusplus"
+        ],
+        "c#": [
+            "csharp",
+            "c sharp",
+            "dotnet",
+            ".net"
+        ],
+        "android": [
+            "android sdk",
+            "android development",
+            "android studio"
+        ],
+        "ios": [
+            "ios development",
+            "iphone development",
+            "ipados"
+        ],
+        "swift": [
+            "swift ui",
+            "swiftui",
+            "swift 5"
+        ],
+        "react native": [
+            "reactnative",
+            "react-native",
+            "rn"
+        ],
+        "flutter": [
+            "dart/flutter",
+            "flutter/dart"
+        ],
+        "postgresql": [
+            "postgres",
+            "psql",
+            "pg",
+            "postgre"
+        ],
+        "mongodb": [
+            "mongo",
+            "mongo db",
+            "mongodb atlas"
+        ],
+        "mysql": [
+            "my sql",
+            "mariadb",
+            "mysql 8"
+        ],
+        "redis": [
+            "redis cache",
+            "redis db"
+        ],
+        "elasticsearch": [
+            "elastic",
+            "elastic search",
+            "es",
+            "opensearch"
+        ],
+        "sqlite": [
+            "sqlite3",
+            "sql lite"
+        ],
+        "aws": [
+            "amazon web services",
+            "amazon aws",
+            "amazon cloud"
+        ],
+        "gcp": [
+            "google cloud",
+            "google cloud platform",
+            "gcloud"
+        ],
+        "azure": [
+            "microsoft azure",
+            "ms azure",
+            "azure cloud"
+        ],
+        "docker": [
+            "containerization",
+            "docker containers",
+            "docker compose"
+        ],
+        "kubernetes": [
+            "k8s",
+            "kube",
+            "k8",
+            "kubectl"
+        ],
+        "terraform": [
+            "tf",
+            "terraform cloud",
+            "hashicorp terraform"
+        ],
+        "ansible": [
+            "ansible playbook",
+            "red hat ansible"
+        ],
+        "ci/cd": [
+            "cicd",
+            "ci cd",
+            "continuous integration",
+            "continuous deployment"
+        ],
+        "github actions": [
+            "gh actions",
+            "github workflows"
+        ],
+        "jenkins": [
+            "jenkins ci",
+            "jenkins pipeline"
+        ],
+        "machine learning": [
+            "ml",
+            "machine-learning"
+        ],
+        "deep learning": [
+            "dl",
+            "neural networks",
+            "neural nets"
+        ],
+        "tensorflow": [
+            "tf ml",
+            "tensor flow",
+            "tensorflow 2"
+        ],
+        "pytorch": [
+            "torch",
+            "py torch",
+            "pytorch 2"
+        ],
+        "nlp": [
+            "natural language processing",
+            "text processing"
+        ],
+        "computer vision": [
+            "cv",
+            "image processing",
+            "image recognition"
+        ],
+        "llm": [
+            "large language models",
+            "language models",
+            "gpt",
+            "claude",
+            "llama"
+        ],
+        "graphql": [
+            "graph ql",
+            "gql",
+            "apollo graphql"
+        ],
+        "rest api": [
+            "restful",
+            "rest",
+            "restful api",
+            "rest apis"
+        ],
+        "grpc": [
+            "g rpc",
+            "grpc-web"
+        ],
+        "websocket": [
+            "websockets",
+            "ws",
+            "socket.io"
+        ],
+        "git": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "version control"
+        ],
+        "sql": [
+            "structured query language",
+            "sql queries"
+        ],
+        "nosql": [
+            "no sql",
+            "non-relational"
+        ],
+        "linux": [
+            "unix",
+            "ubuntu",
+            "debian",
+            "centos",
+            "rhel"
+        ],
+        "bash": [
+            "shell",
+            "shell scripting",
+            "zsh",
+            "command line"
+        ],
+        "html": [
+            "html5",
+            "html 5"
+        ],
+        "css": [
+            "css3",
+            "css 3",
+            "cascading style sheets"
+        ],
+        "sass": [
+            "scss",
+            "sass/scss"
+        ],
+        "tailwind": [
+            "tailwindcss",
+            "tailwind css"
+        ],
+        "bootstrap": [
+            "bootstrap 5",
+            "twitter bootstrap"
+        ]
+    },
+    "ecosystems": {
+        "aws": [
+            "ec2",
+            "s3",
+            "lambda",
+            "iam",
+            "rds",
+            "dynamodb",
+            "sqs",
+            "sns",
+            "cloudfront",
+            "route53",
+            "eks",
+            "ecs",
+            "fargate",
+            "api gateway",
+            "cloudwatch",
+            "cognito",
+            "secretsmanager",
+            "aurora",
+            "elasticache",
+            "kinesis",
+            "step functions",
+            "eventbridge",
+            "sagemaker"
+        ],
+        "gcp": [
+            "compute engine",
+            "cloud storage",
+            "cloud functions",
+            "bigquery",
+            "pubsub",
+            "gke",
+            "cloud run",
+            "firebase",
+            "firestore",
+            "cloud sql",
+            "vertex ai",
+            "dataflow",
+            "dataproc",
+            "cloud composer"
+        ],
+        "azure": [
+            "azure functions",
+            "blob storage",
+            "cosmos db",
+            "aks",
+            "azure sql",
+            "service bus",
+            "event hubs",
+            "azure devops",
+            "logic apps",
+            "azure ml",
+            "azure redis",
+            "key vault",
+            "app service"
+        ],
+        "react": [
+            "redux",
+            "react query",
+            "react router",
+            "styled-components",
+            "react hook form",
+            "zustand",
+            "recoil",
+            "nextjs",
+            "gatsby"
+        ],
+        "spring": [
+            "spring boot",
+            "spring security",
+            "spring data",
+            "spring cloud",
+            "spring mvc",
+            "spring webflux",
+            "hibernate"
+        ],
+        "kubernetes": [
+            "helm",
+            "kubectl",
+            "istio",
+            "prometheus",
+            "grafana",
+            "argocd",
+            "kustomize",
+            "operator framework"
+        ]
+    }
+}

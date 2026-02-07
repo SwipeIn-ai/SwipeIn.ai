@@ -1,33 +1,70 @@
 package com.swipeapply.app.ui.screens
 
+import android.app.Application
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.swipeapply.app.ui.viewmodel.ProfileCreationViewModel
-import com.swipeapply.app.ui.viewmodel.ViewModelFactory
-import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.model.EducationItem
 import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.ProjectItem
-import android.app.Application
+import com.swipeapply.app.data.model.UserProfile
+import com.swipeapply.app.ui.theme.GradientEnd
+import com.swipeapply.app.ui.theme.GradientStart
+import com.swipeapply.app.ui.viewmodel.ProfileCreationViewModel
+import com.swipeapply.app.ui.viewmodel.ViewModelFactory
 
 @Composable
 fun ProfileCreationScreen(
     onNavigateHome: () -> Unit
 ) {
-    // ViewModel setup matching HomeScreen architecture
     val application = LocalContext.current.applicationContext as Application
     val viewModel: ProfileCreationViewModel = viewModel(
         factory = ViewModelFactory(application)
@@ -35,7 +72,6 @@ fun ProfileCreationScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // File Picker
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.parseResume(context, it) }
     }
@@ -45,11 +81,31 @@ fun ProfileCreationScreen(
     }
 
     if (state.isLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Spacer(Modifier.height(16.dp))
-                Text("Analyzing Resume, This may take a few moments...", style = MaterialTheme.typography.bodyMedium)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    strokeWidth = 3.dp,
+                    color = GradientStart
+                )
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "Analyzing Resume...",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "This may take a few moments",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         return
@@ -58,27 +114,80 @@ fun ProfileCreationScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(Modifier.height(48.dp))
+
         if (state.profile == null) {
-            // Upload View
-            Text("Build Your Profile", style = MaterialTheme.typography.headlineMedium)
-            Text("Upload your resume to auto-fill your profile", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(32.dp))
-            Button(
-                onClick = { launcher.launch("application/pdf") },
+            Icon(
+                Icons.Default.CloudUpload,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = GradientStart
+            )
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Build Your Profile",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Upload your resume to auto-fill your profile",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(40.dp))
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(54.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(GradientStart, GradientEnd)
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .clip(RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Upload Resume (PDF)")
+                TextButton(
+                    onClick = { launcher.launch("application/pdf") },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = Color.White
+                        )
+                        Text(
+                            "Upload Resume (PDF)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
+
             Spacer(Modifier.height(16.dp))
             TextButton(onClick = { viewModel.updateProfileField(UserProfile()) }) {
-                Text("Skip and fill manually")
+                Text(
+                    "Skip and fill manually",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+
             if (state.error != null) {
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -89,22 +198,31 @@ fun ProfileCreationScreen(
                 )
             }
         } else {
-            // Verification View
             val profile = state.profile!!
-            
-            Text("Verify Your Details", style = MaterialTheme.typography.headlineMedium)
-            Text("Please review and correct any information extracted from your resume", 
-                style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(24.dp))
 
-            // ===== BASIC INFO SECTION =====
+            Text(
+                "Verify Your Details",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Review and correct any information extracted from your resume",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(28.dp))
+
             SectionHeader("Basic Information")
-            
+
             OutlinedTextField(
                 value = profile.fullName,
                 onValueChange = { viewModel.updateProfileField(profile.copy(fullName = it)) },
                 label = { Text("Full Name") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(12.dp))
 
@@ -112,7 +230,8 @@ fun ProfileCreationScreen(
                 value = profile.email,
                 onValueChange = { viewModel.updateProfileField(profile.copy(email = it)) },
                 label = { Text("Email") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(12.dp))
 
@@ -120,7 +239,8 @@ fun ProfileCreationScreen(
                 value = profile.phone,
                 onValueChange = { viewModel.updateProfileField(profile.copy(phone = it)) },
                 label = { Text("Phone") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(12.dp))
 
@@ -129,42 +249,43 @@ fun ProfileCreationScreen(
                 onValueChange = { viewModel.updateProfileField(profile.copy(bio = it)) },
                 label = { Text("Professional Summary") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3
+                minLines = 3,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(24.dp))
 
-            // ===== SKILLS & TECH STACK SECTION =====
             SectionHeader("Skills & Tech Stack")
-            
+
             var skillsText by remember { mutableStateOf(profile.skills.joinToString(", ")) }
             OutlinedTextField(
                 value = skillsText,
-                onValueChange = { 
+                onValueChange = {
                     skillsText = it
                     val list = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
                     viewModel.updateProfileField(profile.copy(skills = list))
                 },
                 label = { Text("Skills (comma separated)") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2
+                minLines = 2,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(12.dp))
 
             var techText by remember { mutableStateOf(profile.techStack.joinToString(", ")) }
             OutlinedTextField(
                 value = techText,
-                onValueChange = { 
+                onValueChange = {
                     techText = it
                     val list = it.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
                     viewModel.updateProfileField(profile.copy(techStack = list))
                 },
                 label = { Text("Tech Stack (comma separated)") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2
+                minLines = 2,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(24.dp))
 
-            // ===== EDUCATION SECTION =====
             SectionHeader("Education (${profile.education.size} items)")
             profile.education.forEachIndexed { index, edu ->
                 EducationCard(
@@ -185,7 +306,6 @@ fun ProfileCreationScreen(
             }
             Spacer(Modifier.height(12.dp))
 
-            // ===== EXPERIENCE SECTION =====
             SectionHeader("Experience (${profile.experience.size} items)")
             profile.experience.forEachIndexed { index, exp ->
                 ExperienceCard(
@@ -206,7 +326,6 @@ fun ProfileCreationScreen(
             }
             Spacer(Modifier.height(12.dp))
 
-            // ===== PROJECTS SECTION =====
             SectionHeader("Projects (${profile.projects.size} items)")
             profile.projects.forEachIndexed { index, project ->
                 ProjectCard(
@@ -227,7 +346,7 @@ fun ProfileCreationScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            
+
             if (state.error != null) {
                 Text(
                     state.error!!,
@@ -237,16 +356,33 @@ fun ProfileCreationScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            Button(
-                onClick = { viewModel.saveProfile() },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(54.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(GradientStart, GradientEnd)
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .clip(RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Confirm & Create Profile")
+                TextButton(
+                    onClick = { viewModel.saveProfile() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        "Confirm & Create Profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
@@ -256,9 +392,15 @@ fun SectionHeader(title: String) {
     Text(
         title,
         style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.fillMaxWidth()
     )
-    Divider(modifier = Modifier.padding(vertical = 8.dp))
+    Spacer(Modifier.height(4.dp))
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        modifier = Modifier.padding(bottom = 12.dp)
+    )
 }
 
 @Composable
@@ -268,20 +410,29 @@ fun EducationCard(
     onUpdate: (EducationItem) -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Education ${index + 1}", style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Close, contentDescription = "Delete")
+                Text(
+                    "Education ${index + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
@@ -290,7 +441,8 @@ fun EducationCard(
                 onValueChange = { onUpdate(education.copy(school = it)) },
                 label = { Text("School/University") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -299,7 +451,8 @@ fun EducationCard(
                 onValueChange = { onUpdate(education.copy(degree = it)) },
                 label = { Text("Degree/Certification") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -308,7 +461,8 @@ fun EducationCard(
                 onValueChange = { onUpdate(education.copy(year = it)) },
                 label = { Text("Graduation Year") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
         }
     }
@@ -321,20 +475,29 @@ fun ExperienceCard(
     onUpdate: (ExperienceItem) -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Experience ${index + 1}", style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Close, contentDescription = "Delete")
+                Text(
+                    "Experience ${index + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
@@ -343,7 +506,8 @@ fun ExperienceCard(
                 onValueChange = { onUpdate(experience.copy(company = it)) },
                 label = { Text("Company") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -352,7 +516,8 @@ fun ExperienceCard(
                 onValueChange = { onUpdate(experience.copy(role = it)) },
                 label = { Text("Job Title") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -361,7 +526,8 @@ fun ExperienceCard(
                 onValueChange = { onUpdate(experience.copy(duration = it)) },
                 label = { Text("Duration (e.g., Jan 2020 - Dec 2021)") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -370,7 +536,8 @@ fun ExperienceCard(
                 onValueChange = { onUpdate(experience.copy(description = it)) },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2
+                minLines = 2,
+                shape = RoundedCornerShape(12.dp)
             )
         }
     }
@@ -383,20 +550,29 @@ fun ProjectCard(
     onUpdate: (ProjectItem) -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Project ${index + 1}", style = MaterialTheme.typography.titleSmall)
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Close, contentDescription = "Delete")
+                Text(
+                    "Project ${index + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
@@ -405,7 +581,8 @@ fun ProjectCard(
                 onValueChange = { onUpdate(project.copy(name = it)) },
                 label = { Text("Project Name") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -414,7 +591,8 @@ fun ProjectCard(
                 onValueChange = { onUpdate(project.copy(description = it)) },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2
+                minLines = 2,
+                shape = RoundedCornerShape(12.dp)
             )
             Spacer(Modifier.height(8.dp))
 
@@ -423,7 +601,8 @@ fun ProjectCard(
                 onValueChange = { onUpdate(project.copy(techUsed = it)) },
                 label = { Text("Tech Used (comma separated)") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
         }
     }

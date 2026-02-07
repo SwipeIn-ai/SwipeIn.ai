@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,10 +19,6 @@ import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import kotlinx.coroutines.launch
 
-/**
- * A stack of swipeable cards with depth effect.
- * Shows top 3 cards with decreasing scale and offset.
- */
 @Composable
 fun SwipeCardStack(
     cards: List<JobCard>,
@@ -30,45 +28,42 @@ fun SwipeCardStack(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    
-    // Show maximum 3 cards in the stack
-    val visibleCards = cards.take(3)
-    
+    val visibleCards by remember(cards) {
+        derivedStateOf { cards.take(3) }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 24.dp),
+            .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Render cards in reverse order (bottom to top)
-        // Background cards rendered first (so they appear behind)
         visibleCards.asReversed().forEachIndexed { reversedIndex, card ->
             val index = visibleCards.size - 1 - reversedIndex
-            
-            // Only render background cards in this loop
+
             if (index > 0) {
-                // Calculate scale and offset for depth effect
-                val targetScale = 1f - (index * 0.05f)
-                val targetOffset = index * 8f
-                
+                val targetScale = 1f - (index * 0.04f)
+                val targetOffset = index * 12f
+                val targetAlpha = 1f - (index * 0.15f)
+
                 val scale by animateFloatAsState(
                     targetValue = targetScale,
                     animationSpec = spring(
-                        dampingRatio = 0.8f,
-                        stiffness = 300f
+                        dampingRatio = 0.75f,
+                        stiffness = 400f
                     ),
                     label = "cardScale$index"
                 )
-                
+
                 val offset by animateFloatAsState(
                     targetValue = targetOffset,
                     animationSpec = spring(
-                        dampingRatio = 0.8f,
-                        stiffness = 300f
+                        dampingRatio = 0.75f,
+                        stiffness = 400f
                     ),
                     label = "cardOffset$index"
                 )
-                
+
                 key(card.id) {
                     Box(
                         modifier = Modifier
@@ -77,23 +72,25 @@ fun SwipeCardStack(
                                 scaleX = scale
                                 scaleY = scale
                                 translationY = offset
+                                alpha = targetAlpha
                             }
                     ) {
                         JobSwipeCard(
                             jobCard = card,
                             swipeProgress = 0f,
                             swipeDirection = SwipeDirection.NONE,
-                            onClick = { onCardClicked(card) }
+                            onClick = { }
                         )
                     }
                 }
             }
         }
+
         if (visibleCards.isNotEmpty()) {
             val topCard = visibleCards.first()
 
             val swipeState = rememberSwipeCardState(
-                key = topCard.id, 
+                key = topCard.id,
                 onSwipe = { direction ->
                     onCardSwiped(topCard, direction)
                 }

@@ -1,16 +1,41 @@
 package com.swipeapply.app.ui.screens
 
+import android.app.Application
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -22,17 +47,48 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +101,12 @@ import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
-import com.swipeapply.app.ui.theme.*
+import com.swipeapply.app.ui.theme.AccentGreen
+import com.swipeapply.app.ui.theme.AccentGreenLight
+import com.swipeapply.app.ui.theme.AccentRed
+import com.swipeapply.app.ui.theme.AccentRedLight
+import com.swipeapply.app.ui.theme.GradientEnd
+import com.swipeapply.app.ui.theme.GradientStart
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
 import com.swipeapply.app.ui.viewmodel.UndoableAction
 import com.swipeapply.app.ui.viewmodel.ViewModelFactory
@@ -53,12 +114,7 @@ import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.app.Application
 
-/**
- * Main home screen with card stack and swipe actions.
- * Core Tinder-like experience.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -68,178 +124,76 @@ fun HomeScreen(
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null,
     onNavigateToProfile: () -> Unit = {},
-    onSignOutSuccess: () -> Unit // From Auth changes
+    onSignOutSuccess: () -> Unit
 ) {
-    // --- 1. ViewModel Setup (From Job API changes) ---
-    // We use a factory to pass the Application context to the ViewModel for API/Repo access
-    // --- 1. ViewModel Setup (Correct + Reusable Factory) ---
-
-val application =
-    LocalContext.current.applicationContext as Application
-
-val viewModel: HomeViewModel = viewModel(
-    factory = ViewModelFactory(application)
-)
-
-
+    val application = LocalContext.current.applicationContext as Application
+    val viewModel: HomeViewModel = viewModel(factory = ViewModelFactory(application))
     val uiState by viewModel.uiState.collectAsState()
     val view = LocalView.current
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // --- 2. Auth Setup (From Auth changes) ---
     val scope = rememberCoroutineScope()
     val supabase = SupabaseClient.client
 
-    // --- 3. Effects ---
-    
-    // Show error snackbar (From Job API)
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
-            snackbarHostState.showSnackbar(
-                message = error,
-                duration = SnackbarDuration.Long
-            )
+            snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Long)
         }
     }
 
-    // Bottom sheet state
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
-
-    // Undo history dialog state
+    val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var showUndoDialog by remember { mutableStateOf(false) }
+    var showSettingsSheet by remember { mutableStateOf(false) }
+    var showLogoutConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.showBottomSheet) {
-        if (uiState.showBottomSheet) {
-            sheetState.show()
-        } else {
-            sheetState.hide()
-        }
+        if (uiState.showBottomSheet) detailSheetState.show() else detailSheetState.hide()
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background) // Use Theme color (From Job API)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Top bar
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
             HomeTopBar(
                 stats = viewModel.getStats(),
                 onUndo = {
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.undoLastSwipe()
                 },
-                onUndoLongPress = {
-                    if (uiState.undoHistory.isNotEmpty()) {
-                        showUndoDialog = true
-                    }
-                },
-                isDarkMode = isDarkModeEnabled,
-                onDarkModeToggle = onDarkModeToggle,
-                // Sign Out Logic (From Auth Changes)
-                onSignOut = {
-                    scope.launch {
-                        try {
-                            // Clear local data BEFORE signing out
-                            viewModel.performSignOut()
-                            // Explicitly sign out from Supabase
-                            supabase.auth.signOut(scope = SignOutScope.LOCAL)
-                            delay(250L)
-                        } catch (e: Exception) {
-                            // Optional: log or show error
-                        } finally {
-                            // Navigate only after delay
-                            onSignOutSuccess()
-                        }
-                    }
-                },
-                // Profile navigation
-                onNavigateToProfile = onNavigateToProfile,
-                // Ranking toggle (deterministic, not AI)
-                isRankingEnabled = uiState.isRankingEnabled,
-                onToggleRanking = { viewModel.toggleRanking() },
-                isRanking = uiState.isRanking
+                onSettingsClick = { showSettingsSheet = true }
             )
 
-            // Card stack area (Combined Logic)
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 when {
-                    // Initial Loading
-                    uiState.isLoading -> {
-                        ShimmerCardStack()
-                    }
-                    // Error State (From Job API)
-                    uiState.error != null -> {
-                        ErrorState(
-                            error = uiState.error!!,
-                            onRetry = { viewModel.refreshCards() }
-                        )
-                    }
-                    // Truly empty - no cards AND no more pages to load (From Job API)
+                    uiState.isLoading -> ShimmerCardStack()
+                    uiState.error != null -> ErrorState(error = uiState.error!!, onRetry = { viewModel.refreshCards() })
                     uiState.isEmpty && !uiState.hasMorePages && !uiState.isLoadingMore -> {
-                        EmptyState(
-                            interestedCount = uiState.interestedCards.size,
-                            onReset = { viewModel.resetCards() }
-                        )
+                        EmptyState(interestedCount = uiState.interestedCards.size, onReset = { viewModel.resetCards() })
                     }
-                    // Cards are empty but more are coming (Pagination Loading)
                     uiState.cards.isEmpty() && (uiState.hasMorePages || uiState.isLoadingMore) -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = GradientStart,
-                                strokeWidth = 3.dp
-                            )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            CircularProgressIndicator(color = GradientStart, strokeWidth = 3.dp, modifier = Modifier.size(40.dp))
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Loading more jobs...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary
-                            )
+                            Text(text = "Loading more jobs...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    // Normal state - show cards
                     uiState.cards.isNotEmpty() -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Jobs counter (From Job API)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (uiState.totalJobs > 0) {
                                 Text(
-                                    text = "${uiState.cards.size} remaining of ${uiState.totalJobs} jobs",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextTertiary,
-                                    modifier = Modifier.padding(bottom = 8.dp)
+                                    text = "${uiState.cards.size} of ${uiState.totalJobs} jobs remaining",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-
                             SwipeCardStack(
                                 cards = uiState.cards,
-                                onCardSwiped = { card, direction ->
-                                    viewModel.onCardSwiped(card, direction)
-                                },
-                                onCardClicked = { card ->
-                                    viewModel.selectCard(card)
-                                }
+                                onCardSwiped = { card, direction -> viewModel.onCardSwiped(card, direction) },
+                                onCardClicked = { card -> viewModel.selectCard(card) }
                             )
-
-                            // Loading more indicator (small bar at bottom)
-                            if (uiState.isLoadingMore) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                            AnimatedVisibility(visible = uiState.isLoadingMore) {
                                 LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.5f)
-                                        .height(2.dp),
-                                    color = GradientStart
+                                    modifier = Modifier.fillMaxWidth(0.4f).height(2.dp).clip(RoundedCornerShape(1.dp)),
+                                    color = GradientStart, trackColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             }
                         }
@@ -247,36 +201,31 @@ val viewModel: HomeViewModel = viewModel(
                 }
             }
 
-            // Bottom action buttons
             AnimatedVisibility(
                 visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut()
+                enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = spring(dampingRatio = 0.8f)),
+                exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it / 2 })
             ) {
                 ActionButtons(
                     onSkip = {
                         view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        uiState.cards.firstOrNull()?.let { card ->
-                            viewModel.onCardSwiped(card, SwipeDirection.LEFT)
-                        }
+                        uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
                     },
                     onInterested = {
                         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                        uiState.cards.firstOrNull()?.let { card ->
-                            viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
-                        }
+                        uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.RIGHT) }
                     }
                 )
             }
         }
 
-        // Company detail bottom sheet
         if (uiState.showBottomSheet && uiState.selectedCard != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.dismissBottomSheet() },
-                sheetState = sheetState,
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                containerColor = BackgroundCard,
+                sheetState = detailSheetState,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
                 CompanyDetailSheet(
@@ -290,7 +239,69 @@ val viewModel: HomeViewModel = viewModel(
             }
         }
 
-        // Undo history dialog
+        if (showSettingsSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSettingsSheet = false },
+                sheetState = settingsSheetState,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                SettingsSheet(
+                    isDarkMode = isDarkModeEnabled ?: false,
+                    onDarkModeToggle = { enabled ->
+                        onDarkModeToggle(if (enabled) true else false)
+                    },
+                    isRankingEnabled = uiState.isRankingEnabled,
+                    onToggleRanking = { viewModel.toggleRanking() },
+                    isRanking = uiState.isRanking,
+                    onNavigateToProfile = {
+                        showSettingsSheet = false
+                        onNavigateToProfile()
+                    },
+                    onUndoAll = {
+                        if (uiState.undoHistory.isNotEmpty()) {
+                            showSettingsSheet = false
+                            showUndoDialog = true
+                        }
+                    },
+                    undoCount = uiState.undoHistory.size,
+                    onLogout = {
+                        showSettingsSheet = false
+                        showLogoutConfirmation = true
+                    }
+                )
+            }
+        }
+
+        if (showLogoutConfirmation) {
+            AlertDialog(
+                onDismissRequest = { showLogoutConfirmation = false },
+                title = { Text("Sign Out", fontWeight = FontWeight.Bold) },
+                text = { Text("Are you sure you want to sign out? Your swiped jobs will be saved.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLogoutConfirmation = false
+                            scope.launch {
+                                try {
+                                    viewModel.performSignOut()
+                                    supabase.auth.signOut(scope = SignOutScope.LOCAL)
+                                    delay(250L)
+                                } catch (_: Exception) { } finally { onSignOutSuccess() }
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Sign Out") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutConfirmation = false }) { Text("Cancel") }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
+
         if (showUndoDialog) {
             UndoHistoryDialog(
                 undoHistory = uiState.undoHistory,
@@ -307,12 +318,9 @@ val viewModel: HomeViewModel = viewModel(
             )
         }
 
-        // Snackbar for errors (From Job API)
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
         )
     }
 }
@@ -321,142 +329,35 @@ val viewModel: HomeViewModel = viewModel(
 private fun HomeTopBar(
     stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
     onUndo: () -> Unit,
-    onUndoLongPress: () -> Unit,
-    isDarkMode: Boolean? = null,
-    onDarkModeToggle: (Boolean?) -> Unit = {},
-    onSignOut: () -> Unit,
-    onNavigateToProfile: () -> Unit = {},
-    isRankingEnabled: Boolean = true,
-    onToggleRanking: () -> Unit = {},
-    isRanking: Boolean = false
+    onSettingsClick: () -> Unit
 ) {
-    Surface(
-        color = BackgroundLight,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // App name
             Text(
                 text = "SwipeApply",
                 style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
 
-            // Stats and actions
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Interested count
-                if (stats.interested > 0) {
-                    StatBadge(
-                        count = stats.interested,
-                        color = AccentGreen
-                    )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                AnimatedVisibility(
+                    visible = stats.interested > 0,
+                    enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
+                    exit = scaleOut() + fadeOut()
+                ) {
+                    StatBadge(count = stats.interested, color = AccentGreen)
                 }
 
-                // Undo button with count badge
-                Box {
-                    IconButton(
-                        onClick = onUndo,
-                        modifier = Modifier.pointerInput(Unit) {
-                            detectTapGestures(
-                                onLongPress = { onUndoLongPress() }
-                            )
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Undo (long press for history)",
-                            tint = if (stats.undoCount > 0) Primary else TextSecondary
-                        )
-                    }
-
-                    // Undo count badge
-                    if (stats.undoCount > 0) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Primary,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(16.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Text(
-                                    text = if (stats.undoCount > 9) "9+" else stats.undoCount.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Dark mode toggle button
-                IconButton(onClick = {
-                    val newMode = when (isDarkMode) {
-                        null -> true // System -> Dark
-                        true -> false // Dark -> Light
-                        false -> null // Light -> System
-                    }
-                    onDarkModeToggle(newMode)
-                }) {
+                IconButton(onClick = onSettingsClick) {
                     Icon(
-                        imageVector = when (isDarkMode) {
-                            true -> Icons.Default.LightMode
-                            false -> Icons.Default.DarkMode
-                            null -> Icons.Default.DarkMode
-                        },
-                        contentDescription = "Toggle dark mode",
-                        tint = TextSecondary
-                    )
-                }
-
-                // Ranking toggle button (deterministic ranking)
-                IconButton(onClick = onToggleRanking) {
-                    if (isRanking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = Primary
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = if (isRankingEnabled) "Ranking On" else "Ranking Off",
-                            tint = if (isRankingEnabled) Primary else TextSecondary
-                        )
-                    }
-                }
-
-                // Profile Button
-                IconButton(onClick = onNavigateToProfile) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "My Profile",
-                        tint = TextSecondary
-                    )
-                }
-
-                // Sign Out Button (From Auth changes)
-                IconButton(onClick = onSignOut) {
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = "Sign Out",
-                        tint = AccentRed
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -464,186 +365,246 @@ private fun HomeTopBar(
     }
 }
 
-// --- Helper Composables ---
+@Composable
+private fun SettingsSheet(
+    isDarkMode: Boolean,
+    onDarkModeToggle: (Boolean) -> Unit,
+    isRankingEnabled: Boolean,
+    onToggleRanking: () -> Unit,
+    isRanking: Boolean,
+    onNavigateToProfile: () -> Unit,
+    onUndoAll: () -> Unit,
+    undoCount: Int,
+    onLogout: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp).navigationBarsPadding()
+    ) {
+        Text(
+            text = "Settings",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SettingsItem(
+            icon = Icons.Default.Person,
+            title = "My Profile",
+            subtitle = "View and edit your profile",
+            onClick = onNavigateToProfile
+        )
+
+        SettingsItem(
+            icon = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+            title = "Dark Mode",
+            subtitle = if (isDarkMode) "Currently on" else "Currently off",
+            onClick = { onDarkModeToggle(!isDarkMode) },
+            trailing = {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isDarkMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = if (isDarkMode) "ON" else "OFF",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        )
+
+        SettingsItem(
+            icon = Icons.Default.AutoAwesome,
+            title = "Smart Ranking",
+            subtitle = "Sort jobs by match score",
+            onClick = onToggleRanking,
+            trailing = {
+                if (isRanking) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isRankingEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = if (isRankingEnabled) "ON" else "OFF",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isRankingEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        )
+
+        if (undoCount > 0) {
+            SettingsItem(
+                icon = Icons.Default.Refresh,
+                title = "Undo History",
+                subtitle = "$undoCount actions can be undone",
+                onClick = onUndoAll
+            )
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+        SettingsItem(
+            icon = Icons.Default.ExitToApp,
+            title = "Sign Out",
+            subtitle = "Log out of your account",
+            onClick = onLogout,
+            tint = MaterialTheme.colorScheme.error
+        )
+    }
+}
 
 @Composable
-private fun StatBadge(
-    count: Int,
-    color: Color
+private fun SettingsItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = 0.1f)
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Favorite,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = color,
-                fontWeight = FontWeight.SemiBold
-            )
+            Surface(shape = RoundedCornerShape(12.dp), color = tint.copy(alpha = 0.1f), modifier = Modifier.size(44.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium, color = tint, fontWeight = FontWeight.Medium)
+                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            trailing?.invoke()
         }
     }
 }
 
-// Added ErrorState Composable (From Job API changes)
 @Composable
-private fun ErrorState(
-    error: String,
-    onRetry: () -> Unit
-) {
+private fun StatBadge(count: Int, color: Color) {
+    Surface(shape = RoundedCornerShape(10.dp), color = color.copy(alpha = 0.12f)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(imageVector = Icons.Default.Favorite, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            AnimatedContent(
+                targetState = count,
+                transitionSpec = { (slideInVertically { -it } + fadeIn()) togetherWith (slideOutVertically { it } + fadeOut()) },
+                label = "statCount"
+            ) { targetCount ->
+                Text(text = targetCount.toString(), style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorState(error: String, onRetry: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.padding(32.dp)
     ) {
-        // Error icon
+        Text(text = "⚠️", style = MaterialTheme.typography.displayLarge, modifier = Modifier.padding(bottom = 16.dp))
         Text(
-            text = "⚠️",
-            style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Text(
-            text = "Oops! Something went wrong",
+            text = "Something went wrong",
             style = MaterialTheme.typography.headlineMedium,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Error message
         Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = AccentRedLight,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
         ) {
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodyMedium,
-                color = AccentRed,
+                color = MaterialTheme.colorScheme.onErrorContainer,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(16.dp)
             )
         }
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // Retry button
         Button(
             onClick = onRetry,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Primary
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth().height(52.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Try Again",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text("Try Again", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
         Text(
             text = "Check your internet connection and try again",
             style = MaterialTheme.typography.bodySmall,
-            color = TextTertiary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
-private fun EmptyState(
-    interestedCount: Int,
-    onReset: () -> Unit
-) {
+private fun EmptyState(interestedCount: Int, onReset: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.padding(32.dp)
     ) {
-        // Celebration animation
         val infiniteTransition = rememberInfiniteTransition(label = "empty")
         val scale by infiniteTransition.animateFloat(
             initialValue = 1f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = EaseInOutCubic),
-                repeatMode = RepeatMode.Reverse
-            ),
+            targetValue = 1.08f,
+            animationSpec = infiniteRepeatable(animation = tween(1200, easing = EaseInOutCubic), repeatMode = RepeatMode.Reverse),
             label = "scale"
         )
-
         Text(
             text = "🎉",
             style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+            modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
         Text(
             text = "You're all caught up!",
             style = MaterialTheme.typography.headlineMedium,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(8.dp))
-
         Text(
             text = if (interestedCount > 0) {
                 "You're interested in $interestedCount ${if (interestedCount == 1) "role" else "roles"}.\nTime to send some intros!"
-            } else {
-                "Check back later for new opportunities."
-            },
+            } else { "Check back later for new opportunities." },
             style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(32.dp))
-
-        // Reset button
-        OutlinedButton(
-            onClick = onReset,
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+        OutlinedButton(onClick = onReset, shape = RoundedCornerShape(14.dp)) {
+            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Start over")
         }
@@ -651,37 +612,14 @@ private fun EmptyState(
 }
 
 @Composable
-private fun ActionButtons(
-    onSkip: () -> Unit,
-    onInterested: () -> Unit
-) {
+private fun ActionButtons(onSkip: () -> Unit, onInterested: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 48.dp)
-            .padding(bottom = 32.dp)
-            .navigationBarsPadding(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 56.dp).padding(bottom = 28.dp).navigationBarsPadding(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Skip button
-        ActionButton(
-            icon = Icons.Default.Close,
-            contentDescription = "Skip",
-            containerColor = AccentRedLight,
-            contentColor = AccentRed,
-            onClick = onSkip
-        )
-
-        // Interested button
-        ActionButton(
-            icon = Icons.Default.Favorite,
-            contentDescription = "Interested",
-            containerColor = AccentGreenLight,
-            contentColor = AccentGreen,
-            onClick = onInterested,
-            isLarge = true
-        )
+        ActionButton(icon = Icons.Default.Close, contentDescription = "Skip", containerColor = AccentRedLight, contentColor = AccentRed, onClick = onSkip)
+        ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = AccentGreenLight, contentColor = AccentGreen, onClick = onInterested, isLarge = true)
     }
 }
 
@@ -694,171 +632,75 @@ private fun ActionButton(
     onClick: () -> Unit,
     isLarge: Boolean = false
 ) {
-    val size = if (isLarge) 72.dp else 60.dp
-    val iconSize = if (isLarge) 32.dp else 24.dp
-
+    val size = if (isLarge) 68.dp else 56.dp
+    val iconSize = if (isLarge) 30.dp else 22.dp
     FilledIconButton(
         onClick = onClick,
-        modifier = Modifier
-            .size(size)
-            .shadow(
-                elevation = 8.dp,
-                shape = CircleShape,
-                spotColor = contentColor.copy(alpha = 0.3f)
-            ),
+        modifier = Modifier.size(size).shadow(elevation = 12.dp, shape = CircleShape, spotColor = contentColor.copy(alpha = 0.25f)),
         shape = CircleShape,
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        )
+        colors = IconButtonDefaults.filledIconButtonColors(containerColor = containerColor, contentColor = contentColor)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(iconSize)
-        )
+        Icon(imageVector = icon, contentDescription = contentDescription, modifier = Modifier.size(iconSize))
     }
 }
 
 @Composable
-private fun CompanyDetailSheet(
-    jobCard: JobCard,
-    onDismiss: () -> Unit,
-    onRequestIntro: () -> Unit
-) {
+private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onRequestIntro: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = 500.dp)
             .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
             .navigationBarsPadding()
     ) {
-        // Company info header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
         ) {
-            // Logo
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = GradientStart.copy(alpha = 0.1f),
-                modifier = Modifier.size(56.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = jobCard.company.name.take(2).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = GradientStart,
-                        fontWeight = FontWeight.Bold
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Surface(shape = RoundedCornerShape(14.dp), color = GradientStart.copy(alpha = 0.1f), modifier = Modifier.size(56.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = jobCard.company.name.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = GradientStart, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Column {
+                    Text(text = jobCard.company.name, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                    Text(text = jobCard.company.industry, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-
-            Column {
-                Text(
-                    text = jobCard.company.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = jobCard.company.industry,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(text = "About the company", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = jobCard.company.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(text = "The role", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = jobCard.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = jobCard.roleDescription, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(24.dp))
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "Why this matches you", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = jobCard.matchReason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                }
             }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Company description
-        Text(
-            text = "About the company",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextTertiary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = jobCard.company.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Role details
-        Text(
-            text = "The role",
-            style = MaterialTheme.typography.labelMedium,
-            color = TextTertiary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = jobCard.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = TextPrimary,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = jobCard.roleDescription,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Why it matches
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = ChipBackgroundAccent
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Why this matches you",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = ChipTextAccent,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = jobCard.matchReason,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // CTA Button with gradient
+        Spacer(modifier = Modifier.height(20.dp))
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(
-                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        colors = listOf(GradientStart, GradientEnd)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.fillMaxWidth().height(56.dp).background(
+                brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
+                shape = RoundedCornerShape(16.dp)
+            ).clip(RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            TextButton(
-                onClick = onRequestIntro,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Text(
-                    text = "Request intro template",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White
-                )
+            TextButton(onClick = onRequestIntro, modifier = Modifier.fillMaxSize()) {
+                Text(text = "Request intro template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -872,126 +714,45 @@ private fun UndoHistoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Undo History",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
+        title = { Text(text = "Undo History", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
         text = {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "${undoHistory.size} actions can be undone",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(text = "${undoHistory.size} actions can be undone", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // History list
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(undoHistory.reversed()) { action ->
-                        UndoHistoryItem(action = action)
-                    }
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(undoHistory.reversed()) { action -> UndoHistoryItem(action = action) }
                 }
             }
         },
         confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Undo all button
-                TextButton(
-                    onClick = { onUndoCount(undoHistory.size) },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Primary
-                    )
-                ) {
-                    Text("Undo All")
-                }
-
-                // Undo last 5
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onUndoCount(undoHistory.size) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)) { Text("Undo All") }
                 if (undoHistory.size >= 5) {
-                    TextButton(
-                        onClick = { onUndoCount(5) },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Primary
-                        )
-                    ) {
-                        Text("Undo 5")
-                    }
+                    TextButton(onClick = { onUndoCount(5) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)) { Text("Undo 5") }
                 }
             }
         },
         dismissButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = onClearHistory,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = AccentRed
-                    )
-                ) {
-                    Text("Clear")
-                }
-
-                TextButton(onClick = onDismiss) {
-                    Text("Close")
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onClearHistory, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Clear") }
+                TextButton(onClick = onDismiss) { Text("Close") }
             }
         },
-        containerColor = BackgroundCard,
-        shape = RoundedCornerShape(20.dp)
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(24.dp)
     )
 }
 
 @Composable
 private fun UndoHistoryItem(action: UndoableAction) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = BackgroundSecondary,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = action.card.company.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = action.card.title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
+                Text(text = action.card.company.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                Text(text = action.card.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            // Direction badge
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (action.result.isInterested) AccentGreenLight else AccentRedLight
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            Surface(shape = RoundedCornerShape(8.dp), color = if (action.result.isInterested) AccentGreen.copy(alpha = 0.12f) else AccentRed.copy(alpha = 0.12f)) {
+                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (action.result.isInterested) Icons.Default.Favorite else Icons.Default.Close,
                         contentDescription = null,
@@ -1008,12 +769,4 @@ private fun UndoHistoryItem(action: UndoableAction) {
             }
         }
     }
-}
-
-// Extension for graphicsLayer on Text
-@Composable
-private fun Modifier.graphicsLayer(block: androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit): Modifier {
-    return this.then(
-        Modifier.graphicsLayer(block)
-    )
 }

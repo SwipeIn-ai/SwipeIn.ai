@@ -1,0 +1,191 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.swipeapply.app"
+4    android:versionCode="3"
+5    android:versionName="1.2" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="36" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:4:1-63
+11-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:4:18-60
+12
+13    <permission
+13-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:22:5-24:47
+14        android:name="com.swipeapply.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+14-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:23:9-81
+15        android:protectionLevel="signature" />
+15-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:24:9-44
+16
+17    <uses-permission android:name="com.swipeapply.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+17-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:26:5-97
+17-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:26:22-94
+18
+19    <application
+19-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:5:5-32:19
+20        android:allowBackup="true"
+20-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:6:9-35
+21        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+21-->[androidx.core:core:1.15.0] /home/gearhead/.gradle/caches/8.11.1/transforms/a0a52b3baf6c6e447f7012debe4e2063/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
+22        android:dataExtractionRules="@xml/data_extraction_rules"
+22-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:7:9-65
+23        android:debuggable="true"
+24        android:extractNativeLibs="false"
+25        android:fullBackupContent="@xml/backup_rules"
+25-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:8:9-54
+26        android:icon="@mipmap/ic_launcher"
+26-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:9:9-43
+27        android:label="@string/app_name"
+27-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:10:9-41
+28        android:roundIcon="@mipmap/ic_launcher_round"
+28-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:11:9-54
+29        android:supportsRtl="true"
+29-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:12:9-35
+30        android:theme="@style/Theme.SwipeApply" >
+30-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:13:9-48
+31        <activity
+31-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:15:9-31:20
+32            android:name="com.swipeapply.app.MainActivity"
+32-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:16:13-41
+33            android:exported="true"
+33-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:17:13-36
+34            android:theme="@style/Theme.SwipeApply" >
+34-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:18:13-52
+35            <intent-filter>
+35-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:19:13-22:29
+36                <action android:name="android.intent.action.MAIN" />
+36-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:20:17-69
+36-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:20:25-66
+37
+38                <category android:name="android.intent.category.LAUNCHER" />
+38-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:21:17-77
+38-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:21:27-74
+39            </intent-filter>
+40            <intent-filter>
+40-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:23:13-30:29
+41                <action android:name="android.intent.action.VIEW" />
+41-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:24:17-69
+41-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:24:25-66
+42
+43                <category android:name="android.intent.category.DEFAULT" />
+43-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:25:17-76
+43-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:25:27-73
+44                <category android:name="android.intent.category.BROWSABLE" />
+44-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:26:17-78
+44-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:26:27-75
+45
+46                <data
+46-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:27:17-29:47
+47                    android:host="callback"
+47-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:29:21-44
+48                    android:scheme="swipeapply" />
+48-->/home/gearhead/Downloads/SwipeApply-fixed/app/src/main/AndroidManifest.xml:28:21-48
+49            </intent-filter>
+50        </activity>
+51
+52        <provider
+52-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:9:9-17:20
+53            android:name="androidx.startup.InitializationProvider"
+53-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:10:13-67
+54            android:authorities="com.swipeapply.app.androidx-startup"
+54-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:11:13-68
+55            android:exported="false" >
+55-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:12:13-37
+56            <meta-data
+56-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:14:13-16:52
+57                android:name="io.github.jan.supabase.auth.SupabaseInitializer"
+57-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:15:17-79
+58                android:value="androidx.startup" />
+58-->[io.github.jan-tennert.supabase:auth-kt-android:3.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/036130993c7a2d3a3d3e57abfe17b66e/transformed/auth-kt/AndroidManifest.xml:16:17-49
+59            <meta-data
+59-->[androidx.emoji2:emoji2:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/1835ccb335847e2de37c6ef5f44b394e/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+60                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+60-->[androidx.emoji2:emoji2:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/1835ccb335847e2de37c6ef5f44b394e/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+61                android:value="androidx.startup" />
+61-->[androidx.emoji2:emoji2:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/1835ccb335847e2de37c6ef5f44b394e/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+62            <meta-data
+62-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/gearhead/.gradle/caches/8.11.1/transforms/794075d54896cc8162e95e4eb9492017/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
+63                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+63-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/gearhead/.gradle/caches/8.11.1/transforms/794075d54896cc8162e95e4eb9492017/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
+64                android:value="androidx.startup" />
+64-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/gearhead/.gradle/caches/8.11.1/transforms/794075d54896cc8162e95e4eb9492017/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
+65            <meta-data
+65-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/8dc067e274fd1369f80edc43b87eb69c/transformed/multiplatform-settings-no-arg-debug/AndroidManifest.xml:29:13-31:52
+66                android:name="com.russhwolf.settings.SettingsInitializer"
+66-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/8dc067e274fd1369f80edc43b87eb69c/transformed/multiplatform-settings-no-arg-debug/AndroidManifest.xml:30:17-74
+67                android:value="androidx.startup" />
+67-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.3.0] /home/gearhead/.gradle/caches/8.11.1/transforms/8dc067e274fd1369f80edc43b87eb69c/transformed/multiplatform-settings-no-arg-debug/AndroidManifest.xml:31:17-49
+68            <meta-data
+68-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+69                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+69-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+70                android:value="androidx.startup" />
+70-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+71        </provider>
+72
+73        <activity
+73-->[androidx.compose.ui:ui-tooling-android:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/75b4f6ed3d7298289d8bcac32e677836/transformed/ui-tooling/AndroidManifest.xml:23:9-25:39
+74            android:name="androidx.compose.ui.tooling.PreviewActivity"
+74-->[androidx.compose.ui:ui-tooling-android:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/75b4f6ed3d7298289d8bcac32e677836/transformed/ui-tooling/AndroidManifest.xml:24:13-71
+75            android:exported="true" />
+75-->[androidx.compose.ui:ui-tooling-android:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/75b4f6ed3d7298289d8bcac32e677836/transformed/ui-tooling/AndroidManifest.xml:25:13-36
+76        <activity
+76-->[androidx.compose.ui:ui-test-manifest:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/ead87bc3661e5b1c3c3506fdad7bca54/transformed/ui-test-manifest-1.9.0/AndroidManifest.xml:23:9-26:79
+77            android:name="androidx.activity.ComponentActivity"
+77-->[androidx.compose.ui:ui-test-manifest:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/ead87bc3661e5b1c3c3506fdad7bca54/transformed/ui-test-manifest-1.9.0/AndroidManifest.xml:24:13-63
+78            android:exported="true"
+78-->[androidx.compose.ui:ui-test-manifest:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/ead87bc3661e5b1c3c3506fdad7bca54/transformed/ui-test-manifest-1.9.0/AndroidManifest.xml:25:13-36
+79            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+79-->[androidx.compose.ui:ui-test-manifest:1.9.0] /home/gearhead/.gradle/caches/8.11.1/transforms/ead87bc3661e5b1c3c3506fdad7bca54/transformed/ui-test-manifest-1.9.0/AndroidManifest.xml:26:13-76
+80
+81        <service
+81-->[androidx.room:room-runtime-android:2.7.0-alpha11] /home/gearhead/.gradle/caches/8.11.1/transforms/4b88cc9f9579720850b21bea5a50744e/transformed/room-runtime-release/AndroidManifest.xml:24:9-28:63
+82            android:name="androidx.room.MultiInstanceInvalidationService"
+82-->[androidx.room:room-runtime-android:2.7.0-alpha11] /home/gearhead/.gradle/caches/8.11.1/transforms/4b88cc9f9579720850b21bea5a50744e/transformed/room-runtime-release/AndroidManifest.xml:25:13-74
+83            android:directBootAware="true"
+83-->[androidx.room:room-runtime-android:2.7.0-alpha11] /home/gearhead/.gradle/caches/8.11.1/transforms/4b88cc9f9579720850b21bea5a50744e/transformed/room-runtime-release/AndroidManifest.xml:26:13-43
+84            android:exported="false" />
+84-->[androidx.room:room-runtime-android:2.7.0-alpha11] /home/gearhead/.gradle/caches/8.11.1/transforms/4b88cc9f9579720850b21bea5a50744e/transformed/room-runtime-release/AndroidManifest.xml:27:13-37
+85
+86        <receiver
+86-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+87            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+87-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+88            android:directBootAware="false"
+88-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+89            android:enabled="true"
+89-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+90            android:exported="true"
+90-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+91            android:permission="android.permission.DUMP" >
+91-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+92            <intent-filter>
+92-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+93                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+93-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+93-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+94            </intent-filter>
+95            <intent-filter>
+95-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+96                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+96-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+96-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+97            </intent-filter>
+98            <intent-filter>
+98-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+99                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+99-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+99-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+100            </intent-filter>
+101            <intent-filter>
+101-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+102                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+102-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+102-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/gearhead/.gradle/caches/8.11.1/transforms/30e65de3ce121290c802b95577b4c45e/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+103            </intent-filter>
+104        </receiver>
+105    </application>
+106
+107</manifest>

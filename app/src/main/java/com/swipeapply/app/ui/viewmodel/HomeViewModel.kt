@@ -26,18 +26,12 @@ import kotlin.math.min
 
 private const val TAG = "HomeViewModel"
 
-/**
- * Represents a single undo-able action
- */
 data class UndoableAction(
     val card: JobCard,
     val result: SwipeResult,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-/**
- * UI State for the Home/Swipe screen
- */
 data class HomeUiState(
     val cards: List<JobCard> = emptyList(),
     val interestedCards: List<JobCard> = emptyList(),
@@ -52,19 +46,12 @@ data class HomeUiState(
     val error: String? = null,
     val hasMorePages: Boolean = true,
     val totalJobs: Int = 0,
-    // Deterministic Ranking state (NO AI in ranking)
     val isRankingEnabled: Boolean = true,
     val isRanking: Boolean = false,
-    val userProfile: UserProfile? = null
+    val userProfile: UserProfile? = null,
+    val searchQuery: String? = null  // Dynamic search based on profile
 )
 
-/**
- * ViewModel for the Home/Swipe screen.
- * Manages card stack state and swipe actions.
- * 
- * IMPORTANT: Job ranking is DETERMINISTIC (rule-based).
- * AI is ONLY used for generating "Why this job?" explanations.
- */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = JobRepository.getInstance(
@@ -82,50 +69,139 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        // Initialize the deterministic ranking engine
         JobRankingService.initialize(application.applicationContext)
-        // Try to set current user from Supabase auth
         initializeCurrentUser()
-        // Fetch user profile for ranking
-        fetchUserProfileForRanking()
-        loadCards()
+        // First fetch profile, then load cards with profile-based search
+        fetchUserProfileThenLoadCards()
     }
     
-    /**
-     * Initialize current user ID from Supabase auth (if logged in)
-     */
     private fun initializeCurrentUser() {
         try {
             val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
             repository.setCurrentUser(userId)
             Log.d(TAG, "Initialized user: ${userId ?: "local_user (dev mode)"}")
         } catch (e: Exception) {
-            Log.w(TAG, "Could not get current user, using local_user: ${e.message}")
+            Log.w(TAG, "Could not get current user: ${e.message}")
             repository.setCurrentUser(null)
         }
     }
 
     /**
-     * Fetch user profile from Supabase for deterministic ranking
+     * Fetch profile first, build search query, THEN load cards.
+     * This ensures HR resume gets HR jobs, SDE resume gets SDE jobs.
      */
-    private fun fetchUserProfileForRanking() {
+    private fun fetchUserProfileThenLoadCards() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            
             try {
                 val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
-                if (userId == null) {
-                    Log.d(TAG, "No user logged in, ranking will use basic sorting")
-                    return@launch
+                
+                if (userId != null) {
+                    val profile = fetchProfileFromSupabase(userId)
+                    if (profile != null) {
+                        val searchQuery = buildSearchQueryFromProfile(profile)
+                        _uiState.update { 
+                            it.copy(
+                                userProfile = profile,
+                                searchQuery = searchQuery
+                            )
+                        }
+                        Log.d(TAG, "Built search query from profile: $searchQuery")
+                    }
                 }
-
-                val profile = fetchProfileFromSupabase(userId)
-                if (profile != null) {
-                    _uiState.update { it.copy(userProfile = profile) }
-                    Log.d(TAG, "Loaded user profile for ranking: ${profile.fullName}")
-                }
+                
+                // Now load cards with the profile-based search query
+                loadCardsWithCurrentSearch()
             } catch (e: Exception) {
-                Log.w(TAG, "Could not fetch profile for AI ranking: ${e.message}")
+                Log.e(TAG, "Error fetching profile: ${e.message}")
+                // Fall back to loading without profile filter
+                loadCardsWithCurrentSearch()
             }
         }
+    }
+
+    /**
+     * Build search query from user's skills and tech stack.
+     * This ensures different resumes see different jobs.
+     * 
+     * Strategy:
+     * - Use ALL skills and tech keywords (no limits)
+     * - Add role-based keywords from experience
+     * - Combine with OR logic for MAXIMUM results
+     * - Example: "python OR java OR react" shows all related jobs
+     */
+    private fun buildSearchQueryFromProfile(profile: UserProfile): String? {
+        val allKeywords = mutableListOf<String>()
+        
+        // Add ALL skills (no limit)
+        profile.skills.forEach { skill ->
+            allKeywords.add(skill.lowercase().trim())
+        }
+        
+        // Add ALL tech stack (no limit)
+        profile.techStack.forEach { tech ->
+            allKeywords.add(tech.lowercase().trim())
+        }
+        
+        // Extract keywords from ALL experience roles
+        profile.experience.forEach { exp ->
+            val title = exp.role.lowercase()
+            // Add the role itself as keyword
+            title.split(" ").forEach { word ->
+                if (word.length > 2) allKeywords.add(word)
+            }
+            // Add related keywords based on role type
+            when {
+                title.contains("hr") || title.contains("recruit") || title.contains("talent") -> {
+                    allKeywords.addAll(listOf("hr", "recruiter", "talent", "human resources", "hiring"))
+                }
+                title.contains("manager") -> allKeywords.addAll(listOf("manager", "management", "lead"))
+                title.contains("engineer") || title.contains("developer") -> {
+                    allKeywords.addAll(listOf("engineer", "developer", "software", "programming"))
+                }
+                title.contains("design") -> allKeywords.addAll(listOf("designer", "design", "ui", "ux"))
+                title.contains("market") -> allKeywords.addAll(listOf("marketing", "growth", "seo", "content"))
+                title.contains("product") -> allKeywords.addAll(listOf("product", "pm", "roadmap"))
+                title.contains("data") -> allKeywords.addAll(listOf("data", "analytics", "ml", "ai"))
+                title.contains("devops") || title.contains("sre") -> {
+                    allKeywords.addAll(listOf("devops", "sre", "infrastructure", "cloud"))
+                }
+                title.contains("frontend") || title.contains("front-end") -> {
+                    allKeywords.addAll(listOf("frontend", "react", "vue", "angular", "javascript"))
+                }
+                title.contains("backend") || title.contains("back-end") -> {
+                    allKeywords.addAll(listOf("backend", "api", "server", "database"))
+                }
+                title.contains("fullstack") || title.contains("full-stack") -> {
+                    allKeywords.addAll(listOf("fullstack", "full-stack", "frontend", "backend"))
+                }
+            }
+        }
+        
+        // Remove duplicates and empty strings - NO LIMIT on count
+        val uniqueKeywords = allKeywords
+            .filter { it.isNotBlank() && it.length > 1 }
+            .distinct()
+        
+        if (uniqueKeywords.isEmpty()) {
+            Log.d(TAG, "No keywords found in profile, using default search")
+            return null
+        }
+        
+        // Join ALL keywords with " OR " for MAXIMUM results
+        // This ensures C++ AND Python jobs both show up
+        val query = uniqueKeywords.joinToString(" OR ")
+        Log.d(TAG, "🔍 Full keyword list (${uniqueKeywords.size} keywords): $uniqueKeywords")
+        Log.d(TAG, "🔍 Search query: $query")
+        return query
+    }
+
+    /**
+     * Get current search query - from profile or fall back to default
+     */
+    private fun getCurrentSearchQuery(): String? {
+        return _uiState.value.searchQuery ?: ApiConfig.DEFAULT_SEARCH_QUERY
     }
 
     private suspend fun fetchProfileFromSupabase(userId: String): UserProfile? = withContext(Dispatchers.IO) {
@@ -157,25 +233,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Load initial cards from repository
-     */
-    private fun loadCards() {
-        Log.d(TAG, "loadCards() - Starting...")
+    private fun loadCardsWithCurrentSearch() {
+        val searchQuery = getCurrentSearchQuery()
+        Log.d(TAG, "loadCardsWithCurrentSearch() - query: $searchQuery")
+        
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
                 repository.getJobCards(
-                    search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                    search = searchQuery,
                     location = ApiConfig.DEFAULT_LOCATION,
                     remote = ApiConfig.DEFAULT_REMOTE_ONLY
                 ).collect { result ->
                     result.fold(
                         onSuccess = { cards ->
-                            Log.d(TAG, "loadCards() - SUCCESS: Got ${cards.size} cards")
-                            
-                            // Apply AI ranking if enabled and profile exists
+                            Log.d(TAG, "loadCards() - SUCCESS: Got ${cards.size} cards for query: $searchQuery")
                             val sortedCards = applyRankingIfEnabled(cards)
                             
                             _uiState.update {
@@ -190,40 +263,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         },
                         onFailure = { exception ->
-                            val errorMessage = exception.message ?: "Failed to load jobs"
-                            Log.e(TAG, "loadCards() - FAILURE: $errorMessage", exception)
+                            Log.e(TAG, "loadCards() - FAILURE: ${exception.message}", exception)
                             _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    error = errorMessage
-                                )
+                                it.copy(isLoading = false, error = exception.message ?: "Failed to load jobs")
                             }
                         }
                     )
                 }
             } catch (e: Exception) {
-                val errorMessage = e.message ?: "An unexpected error occurred"
-                Log.e(TAG, "loadCards() - EXCEPTION: $errorMessage", e)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = errorMessage
-                    )
-                }
+                Log.e(TAG, "loadCards() - EXCEPTION: ${e.message}", e)
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "An unexpected error occurred") }
             }
         }
     }
 
-    /**
-     * Apply DETERMINISTIC ranking to jobs if enabled and user profile exists.
-     * 
-     * NOTE: This uses a rule-based ranking algorithm, NOT AI.
-     * The ranking formula:
-     * - 50% Skill Match
-     * - 25% Experience Match
-     * - 15% Role Alignment
-     * - 10% Tech Stack Depth
-     */
     private suspend fun applyRankingIfEnabled(jobs: List<JobCard>): List<JobCard> {
         val state = _uiState.value
         
@@ -235,13 +288,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val profile = state.userProfile
         if (profile == null) {
             Log.d(TAG, "No user profile, using quick match scoring")
-            // Use quick local matching as fallback
-            return jobs.sortedByDescending { job ->
-                JobRankingService.quickMatchScore(job, UserProfile())
-            }
+            return jobs.sortedByDescending { job -> JobRankingService.quickMatchScore(job, UserProfile()) }
         }
 
-        // Check if profile has enough data for ranking
         if (profile.techStack.isEmpty() && profile.skills.isEmpty()) {
             Log.d(TAG, "Profile is empty, skipping ranking")
             return jobs
@@ -256,98 +305,74 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             rankedJobs
         } catch (e: Exception) {
             Log.e(TAG, "Ranking failed: ${e.message}", e)
-            jobs // Return original order on failure
+            jobs
         } finally {
             _uiState.update { it.copy(isRanking = false) }
         }
     }
 
-    /**
-     * Toggle deterministic ranking on/off
-     */
     fun toggleRanking() {
         _uiState.update { it.copy(isRankingEnabled = !it.isRankingEnabled) }
-        // Reload cards with new sorting preference
-        loadCards()
+        loadCardsWithCurrentSearch()
     }
 
-    /**
-     * Manually trigger re-ranking of current cards (DETERMINISTIC - NO AI)
-     */
     fun reRankJobs() {
         viewModelScope.launch {
             val currentCards = _uiState.value.cards
             if (currentCards.isEmpty()) return@launch
-            
             val rankedCards = applyRankingIfEnabled(currentCards)
             _uiState.update { it.copy(cards = rankedCards) }
         }
     }
 
-   
-
-    /**
-     * Refresh cards from API
-     */
     fun refreshCards() {
-    // Reset UI state first
-    _uiState.update { it.copy(cards = emptyList(), isLoading = true, error = null) }
-    
-    viewModelScope.launch {
-        try {
-            repository.getJobCards(
-                search = ApiConfig.DEFAULT_SEARCH_QUERY,
-                location = ApiConfig.DEFAULT_LOCATION,
-                remote = ApiConfig.DEFAULT_REMOTE_ONLY,
-                forceRefresh = true
-            ).collect { result ->
-                result.fold(
-                    onSuccess = { cards ->
-                        _uiState.update { 
-                            it.copy(
-                                cards = cards, 
-                                isLoading = false, 
-                                isEmpty = cards.isEmpty()
-                            ) 
+        _uiState.update { it.copy(cards = emptyList(), isLoading = true, error = null) }
+        val searchQuery = getCurrentSearchQuery()
+        
+        viewModelScope.launch {
+            try {
+                repository.getJobCards(
+                    search = searchQuery,
+                    location = ApiConfig.DEFAULT_LOCATION,
+                    remote = ApiConfig.DEFAULT_REMOTE_ONLY,
+                    forceRefresh = true
+                ).collect { result ->
+                    result.fold(
+                        onSuccess = { cards ->
+                            val sortedCards = applyRankingIfEnabled(cards)
+                            _uiState.update { it.copy(cards = sortedCards, isLoading = false, isEmpty = cards.isEmpty()) }
+                        },
+                        onFailure = { e ->
+                            _uiState.update { it.copy(isLoading = false, error = e.message) }
                         }
-                    },
-                    onFailure = { e ->
-                        _uiState.update { 
-                            it.copy(isLoading = false, error = e.message) 
-                        }
-                    }
-                )
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
-        } catch (e: Exception) {
-            _uiState.update { it.copy(isLoading = false, error = e.message) }
         }
     }
-}
 
-// Replace your existing onCardSwiped with this:
-fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
+    fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
+        val searchQuery = getCurrentSearchQuery()
+        
         viewModelScope.launch {
-            // 1. Record Swipe
             repository.recordSwipe(card.id, direction.name)
 
-            // 2. Fetch exactly ONE replacement job from queue
             val nextJob = repository.getNextJobFromQueue(
-                search = ApiConfig.DEFAULT_SEARCH_QUERY,
+                search = searchQuery,
                 location = ApiConfig.DEFAULT_LOCATION,
                 remote = ApiConfig.DEFAULT_REMOTE_ONLY
             )
 
             _uiState.update { state ->
-                // 3. Remove swiped card
                 val currentList = state.cards.toMutableList()
                 currentList.removeIf { it.id == card.id }
 
-                // 4. Add replacement to back
                 if (nextJob != null) {
                     currentList.add(nextJob)
                 }
 
-                // 5. Update State
                 val result = SwipeResult(card.id, direction, direction == SwipeDirection.RIGHT)
                 val undoableAction = UndoableAction(card, result)
 
@@ -429,14 +454,9 @@ fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
 
     fun resetCards() {
         _uiState.update {
-            it.copy(
-                interestedCards = emptyList(),
-                skippedCards = emptyList(),
-                undoHistory = emptyList(),
-                canUndo = false
-            )
+            it.copy(interestedCards = emptyList(), skippedCards = emptyList(), undoHistory = emptyList(), canUndo = false)
         }
-        loadCards()
+        loadCardsWithCurrentSearch()
     }
 
     fun getStats(): SwipeStats {
@@ -448,22 +468,21 @@ fun onCardSwiped(card: JobCard, direction: SwipeDirection) {
             undoCount = state.undoHistory.size
         )
     }
+
     fun performSignOut() {
         viewModelScope.launch {
-            // WIPE ALL DATA so the next user (or same user) gets a fresh start
             repository.clearAllLocalData()
-            _uiState.update { HomeUiState() } // Reset UI state
+            _uiState.update { HomeUiState() }
             Log.d(TAG, "Sign out complete - local data cleared")
         }
     }
+
     fun debugClearHistory() {
-    viewModelScope.launch {
-        // Clear DB table
-        repository.clearSwipeHistory() 
-        // Reset UI
-        refreshCards()
+        viewModelScope.launch {
+            repository.clearSwipeHistory()
+            refreshCards()
+        }
     }
-}
 }
 
 data class SwipeStats(
@@ -473,9 +492,6 @@ data class SwipeStats(
     val undoCount: Int
 )
 
-/**
- * Response model for Supabase profile fetch (used internally by HomeViewModel)
- */
 @kotlinx.serialization.Serializable
 private data class ProfileResponse(
     val id: String,

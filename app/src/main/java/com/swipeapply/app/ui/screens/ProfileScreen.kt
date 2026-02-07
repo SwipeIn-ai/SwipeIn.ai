@@ -5,25 +5,73 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.swipeapply.app.ui.theme.*
+import com.swipeapply.app.ui.theme.AccentGreen
+import com.swipeapply.app.ui.theme.GradientEnd
+import com.swipeapply.app.ui.theme.GradientStart
 import com.swipeapply.app.ui.viewmodel.ProfileViewModel
 import com.swipeapply.app.ui.viewmodel.ViewModelFactory
 import kotlinx.coroutines.launch
@@ -39,7 +87,6 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Show snackbar for success/error
     LaunchedEffect(state.saveSuccess, state.error) {
         if (state.saveSuccess) {
             snackbarHostState.showSnackbar("Profile saved successfully!")
@@ -55,7 +102,13 @@ fun ProfileScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("My Profile") },
+                title = {
+                    Text(
+                        "My Profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -67,11 +120,9 @@ fun ProfileScreen(
                 actions = {
                     if (state.profile != null) {
                         if (state.isEditMode) {
-                            // Cancel button
                             TextButton(onClick = { viewModel.toggleEditMode() }) {
                                 Text("Cancel")
                             }
-                            // Save button
                             TextButton(
                                 onClick = { viewModel.saveProfile() },
                                 enabled = !state.isSaving
@@ -86,7 +137,6 @@ fun ProfileScreen(
                                 }
                             }
                         } else {
-                            // Edit button
                             IconButton(onClick = { viewModel.toggleEditMode() }) {
                                 Icon(Icons.Default.Edit, contentDescription = "Edit")
                             }
@@ -97,7 +147,8 @@ fun ProfileScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Box(
             modifier = Modifier
@@ -106,21 +157,27 @@ fun ProfileScreen(
         ) {
             when {
                 state.isLoading -> {
-                    // Loading State
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                strokeWidth = 3.dp,
+                                color = GradientStart
+                            )
                             Spacer(Modifier.height(16.dp))
-                            Text("Loading profile...")
+                            Text(
+                                "Loading profile...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
 
                 state.profile == null && !state.isLoading -> {
-                    // Error / No Profile State
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -138,7 +195,8 @@ fun ProfileScreen(
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 "Profile not found",
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
@@ -156,16 +214,14 @@ fun ProfileScreen(
                 }
 
                 else -> {
-                    // Profile Content
                     val profile = state.profile!!
-                    
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
                     ) {
-                        // Profile Header
                         ProfileHeader(
                             name = if (state.isEditMode) state.editFullName else profile.fullName,
                             email = if (state.isEditMode) state.editEmail else profile.email
@@ -173,7 +229,6 @@ fun ProfileScreen(
 
                         Spacer(Modifier.height(24.dp))
 
-                        // Edit Mode or View Mode
                         AnimatedVisibility(
                             visible = state.isEditMode,
                             enter = fadeIn(),
@@ -198,7 +253,7 @@ fun ProfileScreen(
                             ViewModeContent(profile = profile)
                         }
 
-                        Spacer(Modifier.height(32.dp))
+                        Spacer(Modifier.height(32.dp).navigationBarsPadding())
                     }
                 }
             }
@@ -211,12 +266,10 @@ private fun ProfileHeader(
     name: String,
     email: String
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        ),
-        shape = RoundedCornerShape(16.dp)
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Row(
             modifier = Modifier
@@ -224,12 +277,15 @@ private fun ProfileHeader(
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
             Box(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(GradientStart),
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(GradientStart, GradientEnd)
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -246,9 +302,11 @@ private fun ProfileHeader(
                 Text(
                     text = name.ifEmpty { "Your Name" },
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (email.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = email,
                         style = MaterialTheme.typography.bodyMedium,
@@ -264,7 +322,6 @@ private fun ProfileHeader(
 @Composable
 private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) {
     Column {
-        // Bio Section
         if (profile.bio.isNotEmpty()) {
             ProfileSection(title = "About Me", icon = Icons.Default.Person) {
                 Text(
@@ -275,7 +332,6 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
             }
         }
 
-        // Contact Section
         if (profile.phone.isNotEmpty()) {
             ProfileSection(title = "Contact", icon = Icons.Default.Phone) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -286,12 +342,15 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(profile.phone, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        profile.phone,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
 
-        // Skills Section
         if (profile.skills.isNotEmpty()) {
             ProfileSection(title = "Skills", icon = Icons.Default.Star) {
                 FlowRow(
@@ -305,7 +364,6 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
             }
         }
 
-        // Tech Stack Section
         if (profile.techStack.isNotEmpty()) {
             ProfileSection(title = "Tech Stack", icon = Icons.Default.Code) {
                 FlowRow(
@@ -319,7 +377,6 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
             }
         }
 
-        // Experience Section
         if (profile.experience.isNotEmpty()) {
             ProfileSection(title = "Experience", icon = Icons.Default.Work) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -335,7 +392,6 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
             }
         }
 
-        // Education Section
         if (profile.education.isNotEmpty()) {
             ProfileSection(title = "Education", icon = Icons.Default.School) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -345,7 +401,8 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
                                 Text(
                                     text = edu.degree,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "${edu.school} • ${edu.year}",
@@ -359,21 +416,20 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
             }
         }
 
-        // Projects Section
         if (profile.projects.isNotEmpty()) {
             ProfileSection(title = "Projects", icon = Icons.Default.Folder) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     profile.projects.forEach { project ->
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
                                     text = project.name,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 if (project.description.isNotEmpty()) {
                                     Spacer(Modifier.height(4.dp))
@@ -384,9 +440,9 @@ private fun ViewModeContent(profile: com.swipeapply.app.data.model.UserProfile) 
                                     )
                                 }
                                 if (project.techUsed.isNotEmpty()) {
-                                    Spacer(Modifier.height(4.dp))
+                                    Spacer(Modifier.height(6.dp))
                                     Text(
-                                        text = "Tech: ${project.techUsed}",
+                                        text = project.techUsed,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = GradientStart
                                     )
@@ -417,6 +473,7 @@ private fun EditModeContent(
             label = { Text("Full Name *") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
         )
 
@@ -426,6 +483,7 @@ private fun EditModeContent(
             label = { Text("Email") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
         )
 
@@ -435,6 +493,7 @@ private fun EditModeContent(
             label = { Text("Phone") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) }
         )
 
@@ -445,6 +504,7 @@ private fun EditModeContent(
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             maxLines = 5,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) }
         )
 
@@ -455,6 +515,7 @@ private fun EditModeContent(
             placeholder = { Text("e.g., Android, Kotlin, Jetpack Compose") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) }
         )
 
@@ -465,6 +526,7 @@ private fun EditModeContent(
             placeholder = { Text("e.g., Kotlin, Java, Python, React") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Code, contentDescription = null) }
         )
 
@@ -488,7 +550,7 @@ private fun ProfileSection(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable () -> Unit
 ) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(vertical = 10.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 12.dp)
@@ -503,7 +565,8 @@ private fun ProfileSection(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         content()
@@ -515,8 +578,8 @@ private fun ProfileSection(
 @Composable
 private fun ChipItem(text: String, color: androidx.compose.ui.graphics.Color) {
     Surface(
-        color = color.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(16.dp)
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(10.dp)
     ) {
         Text(
             text = text,
@@ -534,16 +597,16 @@ private fun ExperienceCard(
     duration: String,
     description: String
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = role,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "$company • $duration",
@@ -551,7 +614,7 @@ private fun ExperienceCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (description.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,

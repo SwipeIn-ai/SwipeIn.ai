@@ -3,7 +3,6 @@ package com.swipeapply.app.ui.components.swipe
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,17 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import com.swipeapply.app.data.model.SwipeDirection
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/**
- * A swipeable card container with Tinder-like gestures.
- * Handles drag, rotation, and spring animations.
- */
 @Composable
 fun SwipeableCard(
     modifier: Modifier = Modifier,
@@ -37,19 +33,22 @@ fun SwipeableCard(
 ) {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
-    
-    // Track previous direction for haptic feedback
+
     var previousDirection by remember { mutableStateOf(SwipeDirection.NONE) }
-    
-    // Trigger haptic feedback when crossing threshold
+    var hasTriggeredHaptic by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.detectedDirection) {
-        if (state.detectedDirection != SwipeDirection.NONE && 
+        if (state.detectedDirection != SwipeDirection.NONE &&
             state.detectedDirection != previousDirection) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            hasTriggeredHaptic = true
+        }
+        if (state.detectedDirection == SwipeDirection.NONE) {
+            hasTriggeredHaptic = false
         }
         previousDirection = state.detectedDirection
     }
-    
+
     Box(
         modifier = modifier
             .offset {
@@ -60,29 +59,38 @@ fun SwipeableCard(
             }
             .graphicsLayer {
                 rotationZ = state.rotation
-                
-                // Subtle scale effect during drag
-                val dragScale = 1f - (state.swipeProgress * 0.02f)
+                val dragProgress = state.swipeProgress
+                val dragScale = 1f - (dragProgress * 0.03f)
                 scaleX = dragScale
                 scaleY = dragScale
+                alpha = 1f - (dragProgress * 0.05f)
             }
             .pointerInput(state) {
-                var velocity = Offset.Zero
-                
+                val velocityTracker = VelocityTracker()
                 detectDragGestures(
                     onDragStart = {
-                        velocity = Offset.Zero
+                        velocityTracker.resetTracking()
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        velocity = dragAmount
+                        val currentTime = change.uptimeMillis
+                        val currentPosition = change.position
+                        velocityTracker.addPosition(currentTime, currentPosition)
                         scope.launch {
                             state.drag(dragAmount)
                         }
                     },
                     onDragEnd = {
+                        val velocity = try {
+                            val v = velocityTracker.calculateVelocity()
+                            Offset(v.x, v.y)
+                        } catch (e: Exception) {
+                            Offset.Zero
+                        }
                         scope.launch {
-                            state.dragEnd(velocity)
+                            state.dragEnd(
+                                Offset(velocity.x * 0.001f, velocity.y * 0.001f)
+                            )
                         }
                     },
                     onDragCancel = {
