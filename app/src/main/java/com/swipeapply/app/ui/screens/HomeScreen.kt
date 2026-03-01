@@ -120,6 +120,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onCardClicked: (JobCard) -> Unit,
     onRequestIntro: (JobCard) -> Unit,
+    onNavigateToEmployeeFinder: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null,
@@ -134,9 +135,27 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val supabase = SupabaseClient.client
 
+    // Track the last right-swiped company for referral navigation
+    var lastRightSwipedCompany by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
             snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Long)
+        }
+    }
+
+    // Show referral finder prompt after right swipe
+    LaunchedEffect(lastRightSwipedCompany) {
+        lastRightSwipedCompany?.let { companyName ->
+            val result = snackbarHostState.showSnackbar(
+                message = "Find referral contacts at $companyName?",
+                actionLabel = "Find Emails",
+                duration = SnackbarDuration.Short
+            )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                onNavigateToEmployeeFinder(companyName)
+            }
+            lastRightSwipedCompany = null
         }
     }
 
@@ -187,7 +206,12 @@ fun HomeScreen(
                             }
                             SwipeCardStack(
                                 cards = uiState.cards,
-                                onCardSwiped = { card, direction -> viewModel.onCardSwiped(card, direction) },
+                                onCardSwiped = { card, direction ->
+                                    viewModel.onCardSwiped(card, direction)
+                                    if (direction == SwipeDirection.RIGHT) {
+                                        lastRightSwipedCompany = card.company.name
+                                    }
+                                },
                                 onCardClicked = { card -> viewModel.selectCard(card) }
                             )
                             AnimatedVisibility(visible = uiState.isLoadingMore) {
@@ -213,7 +237,10 @@ fun HomeScreen(
                     },
                     onInterested = {
                         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                        uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.RIGHT) }
+                        uiState.cards.firstOrNull()?.let { card ->
+                            viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
+                            lastRightSwipedCompany = card.company.name
+                        }
                     }
                 )
             }
@@ -286,6 +313,7 @@ fun HomeScreen(
                             scope.launch {
                                 try {
                                     viewModel.performSignOut()
+                                    com.swipeapply.app.data.repository.UserSyncRepository.clearSession()
                                     supabase.auth.signOut(scope = SignOutScope.LOCAL)
                                     delay(250L)
                                 } catch (_: Exception) { } finally { onSignOutSuccess() }

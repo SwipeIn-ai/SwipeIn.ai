@@ -24,13 +24,17 @@ import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.repository.JobRepository
+import com.swipeapply.app.ui.screens.EmployeeFinderScreen
 import com.swipeapply.app.ui.screens.HomeScreen
 import com.swipeapply.app.ui.screens.IntroTemplateScreen
+import com.swipeapply.app.ui.screens.MainScaffold
 import com.swipeapply.app.ui.screens.OnboardingScreen
 import com.swipeapply.app.ui.screens.ProfileCreationScreen
 import com.swipeapply.app.ui.screens.ProfileScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
@@ -39,6 +43,12 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object IntroTemplate : Screen("intro_template/{jobId}") {
         fun createRoute(jobId: String) = "intro_template/$jobId"
+    }
+    object EmployeeFinder : Screen("employee_finder/{companyName}") {
+        fun createRoute(companyName: String): String {
+            val encoded = URLEncoder.encode(companyName, "UTF-8")
+            return "employee_finder/$encoded"
+        }
     }
 }
 
@@ -150,10 +160,13 @@ fun SwipeApplyNavHost(
         }
 
         composable(route = Screen.Home.route) {
-            HomeScreen(
+            MainScaffold(
                 onCardClicked = { },
                 onRequestIntro = { jobCard ->
                     navController.navigate(Screen.IntroTemplate.createRoute(jobCard.id))
+                },
+                onNavigateToEmployeeFinder = { companyName ->
+                    navController.navigate(Screen.EmployeeFinder.createRoute(companyName))
                 },
                 onDarkModeToggle = onDarkModeToggle,
                 isDarkModeEnabled = isDarkModeEnabled,
@@ -200,6 +213,21 @@ fun SwipeApplyNavHost(
                     onBack = { navController.popBackStack() }
                 )
             }
+        }
+
+        composable(
+            route = Screen.EmployeeFinder.route,
+            arguments = listOf(
+                navArgument("companyName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val encodedName = backStackEntry.arguments?.getString("companyName") ?: return@composable
+            val decodedName = URLDecoder.decode(encodedName, "UTF-8")
+
+            EmployeeFinderScreen(
+                companyName = decodedName,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
