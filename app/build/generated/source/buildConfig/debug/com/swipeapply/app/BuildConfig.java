@@ -12,5 +12,5 @@ public final class BuildConfig {
   // Field from default config.
   public static final String GEMINI_API_KEY = "";
   // Field from default config.
-  public static final String OPENROUTER_API_KEY = "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";
+  public static final String OPENROUTER_API_KEY = "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";
 }

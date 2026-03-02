@@ -19,6 +19,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -42,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
@@ -50,6 +53,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -92,10 +96,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
@@ -223,26 +230,28 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
 
-            AnimatedVisibility(
-                visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
-                enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = spring(dampingRatio = 0.8f)),
-                exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it / 2 })
-            ) {
-                ActionButtons(
-                    onSkip = {
-                        view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
-                    },
-                    onInterested = {
-                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                        uiState.cards.firstOrNull()?.let { card ->
-                            viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
-                            lastRightSwipedCompany = card.company.name
+                // Floating Action Buttons OVER the cards
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
+                    enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = spring(dampingRatio = 0.8f)),
+                    exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it / 2 }),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    ActionButtons(
+                        onSkip = {
+                            view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                            uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
+                        },
+                        onInterested = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            uiState.cards.firstOrNull()?.let { card ->
+                                viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
+                                lastRightSwipedCompany = card.company.name
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
@@ -314,6 +323,7 @@ fun HomeScreen(
                                 try {
                                     viewModel.performSignOut()
                                     com.swipeapply.app.data.repository.UserSyncRepository.clearSession()
+                                    com.swipeapply.app.data.repository.SavedContactsRepository.clearAll()
                                     supabase.auth.signOut(scope = SignOutScope.LOCAL)
                                     delay(250L)
                                 } catch (_: Exception) { } finally { onSignOutSuccess() }
@@ -642,12 +652,13 @@ private fun EmptyState(interestedCount: Int, onReset: () -> Unit) {
 @Composable
 private fun ActionButtons(onSkip: () -> Unit, onInterested: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 56.dp).padding(bottom = 28.dp).navigationBarsPadding(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).padding(bottom = 24.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ActionButton(icon = Icons.Default.Close, contentDescription = "Skip", containerColor = AccentRedLight, contentColor = AccentRed, onClick = onSkip)
-        ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = AccentGreenLight, contentColor = AccentGreen, onClick = onInterested, isLarge = true)
+        ActionButton(icon = Icons.Default.Close, contentDescription = "Skip", containerColor = Color.White, contentColor = Color(0xFF657786), onClick = onSkip, modifier = Modifier.offset(y = (-16).dp))
+        ActionButton(icon = Icons.Default.Bookmark, contentDescription = "Saved", containerColor = Color.White, contentColor = Color(0xFF2196F3), onClick = {}, isSmall = true, modifier = Modifier.offset(y = 8.dp))
+        ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = Color.White, contentColor = Color(0xFFFF5252), onClick = onInterested, modifier = Modifier.offset(y = (-16).dp))
     }
 }
 
@@ -658,13 +669,15 @@ private fun ActionButton(
     containerColor: Color,
     contentColor: Color,
     onClick: () -> Unit,
-    isLarge: Boolean = false
+    modifier: Modifier = Modifier,
+    isLarge: Boolean = false,
+    isSmall: Boolean = false
 ) {
-    val size = if (isLarge) 68.dp else 56.dp
-    val iconSize = if (isLarge) 30.dp else 22.dp
+    val size = if (isSmall) 48.dp else if (isLarge) 68.dp else 56.dp
+    val iconSize = if (isSmall) 24.dp else if (isLarge) 32.dp else 28.dp
     FilledIconButton(
         onClick = onClick,
-        modifier = Modifier.size(size).shadow(elevation = 12.dp, shape = CircleShape, spotColor = contentColor.copy(alpha = 0.25f)),
+        modifier = modifier.size(size).shadow(elevation = 16.dp, shape = CircleShape, spotColor = contentColor.copy(alpha = 0.4f)),
         shape = CircleShape,
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = containerColor, contentColor = contentColor)
     ) {
@@ -672,8 +685,26 @@ private fun ActionButton(
     }
 }
 
+private fun extractDomain(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    return try {
+        var host = url.lowercase().trim()
+        if (host.startsWith("http://")) host = host.substring(7)
+        if (host.startsWith("https://")) host = host.substring(8)
+        val slashIndex = host.indexOf('/')
+        if (slashIndex != -1) host = host.substring(0, slashIndex)
+        if (host.startsWith("www.")) host = host.substring(4)
+        if (host.isBlank()) null else host
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @Composable
 private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onRequestIntro: () -> Unit) {
+    val domain = extractDomain(jobCard.company.website) ?: (jobCard.company.name.replace(" ", "").lowercase() + ".com")
+    val displayUrl = "https://logos.hunter.io/$domain"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -687,9 +718,23 @@ private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onReques
                 .verticalScroll(rememberScrollState())
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Surface(shape = RoundedCornerShape(14.dp), color = GradientStart.copy(alpha = 0.1f), modifier = Modifier.size(56.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.size(56.dp)
+                ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(text = jobCard.company.name.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = GradientStart, fontWeight = FontWeight.Bold)
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(displayUrl)
+                                .crossfade(300)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                 }
                 Column {

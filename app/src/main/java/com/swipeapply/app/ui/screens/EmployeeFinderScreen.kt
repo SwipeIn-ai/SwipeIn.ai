@@ -24,7 +24,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -49,7 +52,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Undo
@@ -225,29 +230,30 @@ fun EmployeeFinderScreen(
                         )
                     }
                 }
-            }
 
-            // Bottom Action Buttons
-            AnimatedVisibility(
-                visible = uiState.visibleEmployees.isNotEmpty() && !uiState.allReviewed && !uiState.isLoading,
-                enter = fadeIn(tween(300)) + slideInVertically(
-                    initialOffsetY = { it / 2 },
-                    animationSpec = spring(dampingRatio = 0.8f)
-                ),
-                exit = fadeOut(tween(200)) + slideOutVertically(
-                    targetOffsetY = { it / 2 }
-                )
-            ) {
-                EmployeeActionButtons(
-                    onDismiss = {
-                        view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        viewModel.dismissContact()
-                    },
-                    onSave = {
-                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                        viewModel.saveContact()
-                    }
-                )
+                // Bottom Action Buttons
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = uiState.visibleEmployees.isNotEmpty() && !uiState.allReviewed && !uiState.isLoading,
+                    enter = fadeIn(tween(300)) + slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(dampingRatio = 0.8f)
+                    ),
+                    exit = fadeOut(tween(200)) + slideOutVertically(
+                        targetOffsetY = { it / 2 }
+                    ),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    EmployeeActionButtons(
+                        onDismiss = {
+                            view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                            viewModel.dismissContact()
+                        },
+                        onSave = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            viewModel.saveContact()
+                        }
+                    )
+                }
             }
         }
 
@@ -437,9 +443,8 @@ private fun EmployeeActionButtons(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 56.dp)
-            .padding(bottom = 28.dp)
-            .navigationBarsPadding(),
+            .padding(horizontal = 48.dp)
+            .padding(bottom = 24.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -448,21 +453,46 @@ private fun EmployeeActionButtons(
             onClick = onDismiss,
             modifier = Modifier
                 .size(56.dp)
+                .offset(y = (-16).dp)
                 .shadow(
-                    elevation = 12.dp,
+                    elevation = 16.dp,
                     shape = CircleShape,
-                    spotColor = AccentRed.copy(alpha = 0.25f)
+                    spotColor = Color(0xFF657786).copy(alpha = 0.4f)
                 ),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = AccentRedLight,
-                contentColor = AccentRed
+                containerColor = Color.White,
+                contentColor = Color(0xFF657786)
             )
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "Dismiss",
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        // Saved (Mock)
+        FilledIconButton(
+            onClick = { },
+            modifier = Modifier
+                .size(48.dp)
+                .offset(y = 8.dp)
+                .shadow(
+                    elevation = 16.dp,
+                    shape = CircleShape,
+                    spotColor = Color(0xFF2196F3).copy(alpha = 0.4f)
+                ),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF2196F3)
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Bookmark,
+                contentDescription = "Saved",
+                modifier = Modifier.size(24.dp)
             )
         }
 
@@ -470,22 +500,23 @@ private fun EmployeeActionButtons(
         FilledIconButton(
             onClick = onSave,
             modifier = Modifier
-                .size(68.dp)
+                .size(56.dp)
+                .offset(y = (-16).dp)
                 .shadow(
-                    elevation = 12.dp,
+                    elevation = 16.dp,
                     shape = CircleShape,
-                    spotColor = AccentGreen.copy(alpha = 0.25f)
+                    spotColor = Color(0xFFFF5252).copy(alpha = 0.4f)
                 ),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = AccentGreenLight,
-                contentColor = AccentGreen
+                containerColor = Color.White,
+                contentColor = Color(0xFFFF5252)
             )
         ) {
             Icon(
-                imageVector = Icons.Default.Bookmark,
+                imageVector = Icons.Default.Favorite,
                 contentDescription = "Save Contact",
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(28.dp)
             )
         }
     }
@@ -920,161 +951,166 @@ private fun EmployeeDetailSheet(
     onCopyEmail: (String) -> Unit,
     onOpenLinkedIn: (String) -> Unit
 ) {
+    val BrandPrimary = Color(0xFF0A66C2)
+    val BrandSecondary = Color(0xFFE8F3FF)
+    val BrandForeground = Color(0xFF1A1D21)
+    val BrandMuted = Color(0xFFF8F9FA)
+    val BrandMutedForeground = Color(0xFF666E76)
+    val BrandBorder = Color(0xFFDEE2E6)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
-            .navigationBarsPadding()
+            .padding(bottom = 24.dp)
+            .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Avatar + Name
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        // Profile Info
+        Box(
+            modifier = Modifier
+                .offset(y = (-48).dp)
+                .size(96.dp)
+                .background(Brush.linearGradient(listOf(BrandSecondary, Color.White, BrandPrimary.copy(alpha = 0.1f))), CircleShape)
+                .border(6.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                .shadow(2.dp, CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = ReferralCyan.copy(alpha = 0.1f),
-                modifier = Modifier.size(56.dp)
+            Box(Modifier.fillMaxSize().background(BrandPrimary.copy(alpha = 0.05f)))
+            Text(
+                text = employee.getInitials(),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = BrandPrimary,
+                letterSpacing = (-1).sp
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.offset(y = (-24).dp)
+        ) {
+            Text(
+                text = employee.fullName,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = BrandForeground,
+                letterSpacing = (-0.5).sp,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Text(
+                text = employee.jobTitle ?: "Employee",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = BrandMutedForeground
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(top = 12.dp)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = employee.getInitials(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = ReferralCyan,
-                        fontWeight = FontWeight.Bold
-                    )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BrandBorder),
+                    shadowElevation = 1.dp,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(companyName.first().toString().uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Black, color = BrandForeground)
+                    }
                 }
-            }
-            Column {
-                Text(
-                    text = employee.fullName,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${employee.jobTitle ?: "Employee"} at $companyName",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(companyName, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
+                Box(modifier = Modifier.padding(horizontal = 8.dp).size(4.dp).background(BrandMutedForeground.copy(alpha = 0.4f), CircleShape))
+                Text("2nd Connection", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = BrandMutedForeground)
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), color = BrandBorder.copy(alpha = 0.6f))
 
-        // Email
-        Text(
-            text = "Email",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Surface(
-            onClick = { onCopyEmail(employee.email) },
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        // AI Assistant Section
+        Column(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
             Row(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Email,
-                    contentDescription = null,
-                    tint = Color(0xFF3B82F6),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = employee.email,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(shape = CircleShape, color = BrandSecondary, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Verified, null, tint = BrandPrimary, modifier = Modifier.padding(6.dp)) // Magic stick mock
+                    }
+                    Text("AI Referral Assistant", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
+                }
+                Surface(shape = RoundedCornerShape(6.dp), color = BrandSecondary.copy(alpha = 0.5f), border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f))) {
+                    Text("DRAFT READY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = BrandPrimary, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                }
             }
-        }
 
-        // Details
-        Spacer(modifier = Modifier.height(20.dp))
-
-        val details = listOfNotNull(
-            employee.department?.let { "Department" to it },
-            employee.seniority?.let { "Seniority" to it },
-            employee.getFormattedLocation().takeIf { it != "Location unknown" }
-                ?.let { "Location" to it },
-            "Confidence" to "${employee.confidence}% (${employee.getConfidenceTier().label})"
-        )
-
-        details.forEach { (label, value) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
-        // LinkedIn
-        if (!employee.linkedinUrl.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
+            // Message Box
             Surface(
-                onClick = { onOpenLinkedIn(employee.linkedinUrl!!) },
-                shape = RoundedCornerShape(14.dp),
-                color = LinkedInBlue.copy(alpha = 0.1f),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(20.dp),
+                color = BrandMuted.copy(alpha = 0.4f),
+                border = BorderStroke(1.dp, BrandBorder.copy(alpha = 0.6f)),
+                shadowElevation = 0.dp // shadow-inner in compose is tricky, keeping flat
             ) {
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                    val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
                     Text(
-                        text = "in",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = LinkedInBlue,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = "Open LinkedIn Profile",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = LinkedInBlue,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(
-                        imageVector = Icons.Default.OpenInNew,
-                        contentDescription = null,
-                        tint = LinkedInBlue,
-                        modifier = Modifier.size(18.dp)
+                        text = "Hi $firstName,\n\nI noticed you work at $companyName and I'm very interested in the roles that recently opened up. I've been working in the industry for a while and would love to connect and learn more about your experience there.\n\nWould you be open to a brief chat or considering a referral?",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = BrandForeground.copy(alpha = 0.9f),
+                        lineHeight = 22.sp
                     )
                 }
             }
+            Text(
+                text = "Personalized based on your profile and the job description.",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = BrandMutedForeground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // Action Buttons
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                onClick = { /* TODO Edit Draft */ },
+                shape = RoundedCornerShape(16.dp),
+                color = BrandSecondary,
+                border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f)),
+                modifier = Modifier.weight(1f).height(56.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Default.Edit, null, tint = BrandPrimary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Edit", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = BrandPrimary)
+                }
+            }
+
+            Surface(
+                onClick = {
+                    onCopyEmail(employee.email)
+                    if (!employee.linkedinUrl.isNullOrBlank()) {
+                        onOpenLinkedIn(employee.linkedinUrl!!)
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                color = BrandPrimary,
+                shadowElevation = 8.dp,
+                modifier = Modifier.weight(2f).height(56.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Default.OpenInNew, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Send Request", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
     }
 }
 

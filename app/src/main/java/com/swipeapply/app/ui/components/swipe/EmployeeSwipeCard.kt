@@ -112,7 +112,7 @@ fun EmployeeSwipeCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.80f)
+            .fillMaxSize()
             .clip(cardShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -129,50 +129,50 @@ fun EmployeeSwipeCard(
                 EmployeeCardHeader(employee = employee, companyName = companyName)
 
                 // Content Area
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 22.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Spacer(modifier = Modifier.height(20.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 22.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    // Email Section - The Star of the Show
-                    EmailSection(employee = employee)
+                        // Email Section - The Star of the Show
+                        EmailSection(employee = employee)
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    // Info Grid
-                    InfoGrid(employee = employee)
+                        // Info Grid
+                        InfoGrid(employee = employee)
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    // Confidence Meter
-                    ConfidenceMeter(employee = employee)
+                        // Confidence Meter
+                        ConfidenceMeter(employee = employee)
 
-                    // LinkedIn Section
-                    if (!employee.linkedinUrl.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        LinkedInSection(url = employee.linkedinUrl!!)
+                        // LinkedIn Section
+                        if (!employee.linkedinUrl.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            LinkedInSection(url = employee.linkedinUrl!!)
+                        }
+
+                        Spacer(modifier = Modifier.height(100.dp)) // Padding for action buttons
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-
-                // Bottom Gradient
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    // Bottom Gradient
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface)
                                 )
                             )
-                        )
-                )
+                    )
+                }
             }
 
             // Swipe Overlays

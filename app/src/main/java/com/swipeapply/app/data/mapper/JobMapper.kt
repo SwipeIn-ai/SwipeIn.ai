@@ -136,7 +136,8 @@ private fun extractWebsiteFromUrl(url: String?): String? {
     if (url.isNullOrBlank()) return null
     return try {
         val domain = url.substringAfter("://").substringBefore("/")
-        domain.removePrefix("www.")
+        val cleanDomain = domain.removePrefix("www.")
+        if (cleanDomain.equals("findwork.dev", ignoreCase = true)) null else cleanDomain
     } catch (e: Exception) {
         null
     }

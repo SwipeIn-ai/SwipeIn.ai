@@ -3,9 +3,9 @@ package com.swipeapply.app.ui.components.swipe
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,12 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.Work
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -56,14 +54,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.swipeapply.app.data.model.Company
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
-import com.swipeapply.app.ui.components.TechStackIcons
-import com.swipeapply.app.ui.theme.AccentGreen
-import com.swipeapply.app.ui.theme.BadgeHiring
-import com.swipeapply.app.ui.theme.BadgeHiringBackground
-import com.swipeapply.app.ui.theme.GradientEnd
-import com.swipeapply.app.ui.theme.GradientStart
+
+private val BrandPrimary = Color(0xFF0A66C2)
+private val BrandSecondary = Color(0xFFE8F3FF)
+private val BrandForeground = Color(0xFF1A1D21)
+private val BrandMuted = Color(0xFFF0F2F5)
+private val BrandBorder = Color(0xFFDEE2E6)
+private val Chart2 = Color(0xFFFF5F6D)
+private val Chart3 = Color(0xFFFFC371)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -76,97 +77,92 @@ fun JobSwipeCard(
 ) {
     val borderColor by animateColorAsState(
         targetValue = when (swipeDirection) {
-            SwipeDirection.RIGHT -> AccentGreen.copy(alpha = swipeProgress * 0.9f)
+            SwipeDirection.RIGHT -> BrandPrimary.copy(alpha = swipeProgress * 0.9f)
             SwipeDirection.LEFT -> MaterialTheme.colorScheme.error.copy(alpha = swipeProgress * 0.9f)
-            SwipeDirection.NONE -> Color.Transparent
+            SwipeDirection.NONE -> BrandBorder
         },
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 500f),
         label = "borderColor"
     )
 
-    val cardShape = RoundedCornerShape(32.dp)
-
-    Card(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.80f)
-            .clip(cardShape)
+            .fillMaxSize()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) { onClick() },
-        shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        border = if (swipeProgress > 0.05f) BorderStroke(3.dp, borderColor) else null
+        shape = RoundedCornerShape(32.dp),
+        color = Color.White,
+        shadowElevation = 8.dp,
+        border = BorderStroke(if (swipeProgress > 0.05f) 2.dp else 1.dp, borderColor)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Hero Header with Company Info
+                // Card Header
                 CardHeader(jobCard)
 
-                // Main Content Area
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 22.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    
-                    // Quick Info Row
-                    QuickInfoRow(jobCard)
-                    
-                    Spacer(modifier = Modifier.height(18.dp))
-                    
-                    // Role Description
-                    Text(
-                        text = "About the Role",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = jobCard.roleDescription.cleanHtml(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 22.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(22.dp))
-                    
-                    // Tech Stack
-                    if (jobCard.techStack.isNotEmpty()) {
-                        Text(
-                            text = "Tech Stack",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        TechStackChips(jobCard.techStack)
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
+                // Scrollable Body
+                Box(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 20.dp)
+                            .padding(bottom = 80.dp), // Extra padding for action buttons
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        // Badges Row
+                        BadgesRow(jobCard)
 
-                // Bottom gradient fade
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        // Tech Stack
+                        if (jobCard.techStack.isNotEmpty()) {
+                            Column {
+                                Text(
+                                    text = "TECH STACK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                                TechStackChips(jobCard.techStack)
+                            }
+                        }
+
+                        // Description
+                        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                            Text(
+                                text = "ABOUT THE ROLE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = jobCard.roleDescription.cleanHtml(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = BrandForeground.copy(alpha = 0.9f),
+                                lineHeight = 24.sp
+                            )
+                        }
+                    }
+
+                    // Bottom Fade
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.White, Color.White)
                                 )
                             )
-                        )
-                )
+                    )
+                }
             }
 
             // Swipe Overlay
@@ -180,232 +176,188 @@ private fun CardHeader(jobCard: JobCard) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        GradientStart.copy(alpha = 0.08f),
-                        MaterialTheme.colorScheme.surface
-                    )
-                )
-            )
+            .padding(20.dp)
     ) {
-        Column(
+        // Decorative background glow
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(22.dp)
-        ) {
+                .align(Alignment.TopEnd)
+                .size(128.dp)
+                .background(BrandPrimary.copy(alpha = 0.05f), CircleShape)
+                .blur(24.dp)
+        )
+
+        Column {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Company Logo
-                CompanyLogo(jobCard.company.name, jobCard.company.logoUrl)
+                CompanyLogo(jobCard.company)
                 
-                // Badges Row
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (jobCard.isHiringNow) {
-                        HiringBadge()
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Company Name
-            Text(
-                text = jobCard.company.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // Job Title
-            Text(
-                text = jobCard.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = GradientStart,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 26.sp
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Location Row - avoid duplicating "Remote"
-            val locationText = jobCard.location
-            val locationType = jobCard.locationType.label
-            val showLocationChip = !locationText.equals(locationType, ignoreCase = true) && 
-                                   !locationText.contains(locationType, ignoreCase = true)
-            
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Referral Badge Mock (or based on logic)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = BrandSecondary,
+                    border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.2f))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = locationText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                if (showLocationChip) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .background(BrandPrimary, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        }
                         Text(
-                            text = locationType,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            text = "Referral Available",
+                            color = BrandPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
                 }
             }
+
+            Text(
+                text = jobCard.title,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = BrandForeground,
+                lineHeight = 28.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            Spacer(modifier = Modifier.height(6.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = jobCard.company.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandForeground
+                )
+                Box(modifier = Modifier.size(4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), CircleShape))
+                Text(
+                    text = "3 days ago", // Mock or from jobCard.postedAt
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = BrandMuted.copy(alpha = 0.6f))
+}
+
+private fun extractDomain(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    return try {
+        var host = url.lowercase().trim()
+        if (host.startsWith("http://")) host = host.substring(7)
+        if (host.startsWith("https://")) host = host.substring(8)
+        val slashIndex = host.indexOf('/')
+        if (slashIndex != -1) host = host.substring(0, slashIndex)
+        if (host.startsWith("www.")) host = host.substring(4)
+        if (host.isBlank()) null else host
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun CompanyLogo(company: Company) {
+    val initials = company.name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
+    val domain = extractDomain(company.website) ?: (company.name.replace(" ", "").lowercase() + ".com")
+    val displayUrl = company.logoUrl ?: "https://logos.hunter.io/$domain"
+
+    Surface(
+        modifier = Modifier.size(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, BrandBorder)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Chart2.copy(alpha = 0.1f), Chart3.copy(alpha = 0.1f), BrandPrimary.copy(alpha = 0.1f))
+                        )
+                    )
+            )
+            Text(
+                text = initials,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = BrandForeground
+            )
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(displayUrl)
+                    .crossfade(300)
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Crop
+            )
         }
     }
 }
 
 @Composable
-private fun QuickInfoRow(jobCard: JobCard) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // Industry chip
-        QuickInfoChip(
-            icon = Icons.Default.Work,
-            text = jobCard.company.industry.take(20)
+private fun BadgesRow(jobCard: JobCard) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        BadgeChip(
+            icon = Icons.Default.LocationOn,
+            text = jobCard.location.take(15) + if(jobCard.location.length > 15) "..." else "",
+            bg = BrandMuted.copy(alpha = 0.5f),
+            textColor = BrandForeground
+        )
+        if (jobCard.locationType.label == "Remote") {
+            BadgeChip(
+                icon = Icons.Default.Home,
+                text = "Remote",
+                bg = BrandSecondary.copy(alpha = 0.4f),
+                textColor = BrandPrimary,
+                borderColor = BrandPrimary.copy(alpha = 0.1f)
+            )
+        }
+        // Mocking salary for now since it's in UI
+        BadgeChip(
+            icon = Icons.Default.MonetizationOn,
+            text = "$120k - $180k",
+            bg = BrandMuted.copy(alpha = 0.5f),
+            textColor = BrandForeground
         )
     }
 }
 
 @Composable
-private fun QuickInfoChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String
-) {
+private fun BadgeChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, bg: Color, textColor: Color, borderColor: Color = BrandBorder.copy(alpha = 0.5f)) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        color = bg,
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-fun String.cleanHtml(): String {
-    return this.replace(Regex("<[^>]*>"), "")
-        .replace("&amp;", "&")
-        .replace("&nbsp;", " ")
-        .replace("&#x2F;", "/")
-        .replace("&quot;", "\"")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .trim()
-}
-
-@Composable
-private fun HiringBadge() {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = BadgeHiringBackground
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(BadgeHiring, CircleShape)
-            )
-            Text(
-                text = "Hiring",
-                style = MaterialTheme.typography.labelMedium,
-                color = BadgeHiring,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompanyLogo(
-    companyName: String,
-    logoUrl: String? = null
-) {
-    val initials = companyName.split(" ")
-        .take(2)
-        .mapNotNull { it.firstOrNull()?.uppercase() }
-        .joinToString("")
-
-    Box(
-        modifier = Modifier
-            .size(64.dp)
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(18.dp), spotColor = GradientStart)
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(GradientStart, GradientEnd)
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!logoUrl.isNullOrEmpty()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(logoUrl)
-                    .crossfade(300)
-                    .build(),
-                contentDescription = "$companyName logo",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(18.dp)),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Text(
-                text = initials,
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
+            Icon(icon, null, tint = textColor.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+            Text(text = text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textColor)
         }
     }
 }
@@ -414,58 +366,47 @@ private fun CompanyLogo(
 @Composable
 private fun TechStackChips(techStack: List<String>) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        techStack.take(8).forEach { tech ->
-            val techIcon = TechStackIcons.getIcon(tech)
+        techStack.take(6).forEachIndexed { index, tech ->
+            val isPrimary = index < 2
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                shape = RoundedCornerShape(8.dp),
+                color = if (isPrimary) BrandSecondary else BrandMuted,
+                border = BorderStroke(1.dp, if (isPrimary) BrandPrimary.copy(alpha = 0.1f) else BrandBorder.copy(alpha = 0.5f)),
+                shadowElevation = if (isPrimary) 1.dp else 0.dp
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = techIcon.icon,
-                        contentDescription = null,
-                        tint = techIcon.color,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = tech,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                Text(
+                    text = tech,
+                    fontSize = 13.sp,
+                    fontWeight = if (isPrimary) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isPrimary) BrandPrimary else BrandForeground,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
             }
         }
     }
 }
 
+fun String.cleanHtml(): String {
+    return this.replace(Regex("<[^>]*>"), "")
+        .replace("&amp;", "&").replace("&nbsp;", " ")
+        .replace("&#x2F;", "/").replace("&quot;", "\"")
+        .replace("&lt;", "<").replace("&gt;", ">").trim()
+}
+
 @Composable
-private fun SwipeOverlay(
-    direction: SwipeDirection,
-    progress: Float
-) {
+private fun SwipeOverlay(direction: SwipeDirection, progress: Float) {
     if (progress > 0.05f) {
         val overlayAlpha = (progress * 0.95f).coerceAtMost(1f)
-        val scale by animateFloatAsState(
-            targetValue = 0.9f + (progress * 0.1f),
-            animationSpec = spring(dampingRatio = 0.7f),
-            label = "scale"
-        )
+        val scale by animateFloatAsState(targetValue = 0.9f + (progress * 0.1f), animationSpec = spring(dampingRatio = 0.7f), label = "")
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(28.dp),
+            modifier = Modifier.fillMaxSize().padding(28.dp),
             contentAlignment = when (direction) {
-                SwipeDirection.RIGHT -> Alignment.TopEnd
-                SwipeDirection.LEFT -> Alignment.TopStart
+                SwipeDirection.RIGHT -> Alignment.TopStart // Like tinder, show LIKE on left when swiping right
+                SwipeDirection.LEFT -> Alignment.TopEnd
                 SwipeDirection.NONE -> Alignment.Center
             }
         ) {
@@ -473,51 +414,32 @@ private fun SwipeOverlay(
                 SwipeDirection.RIGHT -> {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = AccentGreen.copy(alpha = overlayAlpha * 0.15f),
-                        border = BorderStroke(
-                            width = 3.dp,
-                            color = AccentGreen.copy(alpha = overlayAlpha)
-                        ),
-                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+                        color = Color.Transparent,
+                        border = BorderStroke(4.dp, BrandPrimary.copy(alpha = overlayAlpha)),
+                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = -15f }
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = AccentGreen.copy(alpha = overlayAlpha),
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Text(
-                                text = "INTERESTED",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AccentGreen.copy(alpha = overlayAlpha),
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.5.sp
-                            )
-                        }
+                        Text(
+                            text = "APPLY",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black,
+                            color = BrandPrimary.copy(alpha = overlayAlpha),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
                     }
                 }
                 SwipeDirection.LEFT -> {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha * 0.15f),
-                        border = BorderStroke(
-                            width = 3.dp,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha)
-                        ),
-                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+                        color = Color.Transparent,
+                        border = BorderStroke(4.dp, MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha)),
+                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = 15f }
                     ) {
                         Text(
-                            text = "SKIP",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "NOPE",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha),
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 2.sp,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
                 }
