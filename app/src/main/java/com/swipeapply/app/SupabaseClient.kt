@@ -7,8 +7,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 
 object SupabaseClient {
     val client = createSupabaseClient(
-        supabaseUrl = "https://wjhmwdctjcymmunmqcft.supabase.co", 
-        supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqaG13ZGN0amN5bW11bm1xY2Z0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwMTYxODcsImV4cCI6MjA4MzU5MjE4N30.ehrs7opNY_w79VpP746xfOpLrot0LUUVcPSlbAIhjSU"
+        supabaseUrl = BuildConfig.SUPABASE_URL, 
+        supabaseKey = BuildConfig.SUPABASE_ANON_KEY
     ) {
         install(Auth) {
             scheme = "swipeapply"

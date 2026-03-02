@@ -5,9 +5,8 @@ package com.swipeapply.app.data.config
  * Store your FindWork.dev API key here
  */
 object ApiConfig {
-    // TODO: Replace with your actual API key from https://findwork.dev/developers/
-    // Format: Just the key itself, without "Token " prefix
-    const val FINDWORK_API_KEY = "88dfaa3a4e8c9614a5514897a5e4b1ae711a4c3f"
+    // API key loaded from BuildConfig
+    const val FINDWORK_API_KEY = com.swipeapply.app.BuildConfig.FINDWORK_API_KEY
     
     // Search preferences - null to get ALL jobs without filtering
     val DEFAULT_SEARCH_QUERY: String? = null  // null = all jobs, or set specific keyword like "android"

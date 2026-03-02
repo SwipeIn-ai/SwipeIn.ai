@@ -37,6 +37,15 @@ android {
             "OPENROUTER_API_KEY",
             "\"$openRouterKey\""
         )
+        
+        val findworkKey = envProperties.getProperty("FINDWORK_API_KEY") ?: ""
+        buildConfigField("String", "FINDWORK_API_KEY", "\"$findworkKey\"")
+        
+        val supabaseUrl = envProperties.getProperty("SUPABASE_URL") ?: ""
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        
+        val supabaseAnonKey = envProperties.getProperty("SUPABASE_ANON_KEY") ?: ""
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     buildFeatures {
