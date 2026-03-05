@@ -1,24 +1,78 @@
-
+# Gradle
 .gradle/
+gradle/wrapper/gradle-wrapper.jar
 build/
 **/build/
-.env
+!gradle/wrapper/gradle-wrapper.properties
 
+# Local configuration
+local.properties
+.env
+*.env.*
+
+# Android Studio / IntelliJ IDEA
 .idea/
 *.iml
-local.properties
+*.ipr
+*.iws
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/navEditor.xml
 captures/
 .externalNativeBuild/
 .cxx/
 
-*.log
+# Generated sources & KSP
+app/build/generated/
+app/build/intermediates/
+app/build/kotlin/
+app/build/kspCaches/
+app/build/outputs/
+app/build/tmp/
+**/generated/
+**/kspCaches/
 
+# APKs and bundles
+*.apk
+*.aab
+*.ap_
+
+# ProGuard
+*.map
+proguard/
+mapping.txt
+seeds.txt
+usage.txt
+
+# Log files
+*.log
+logs/
+
+# OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
+# Misc output dirs
 out/
 bin/
 
+# Heap dumps
 *.hprof
 
+# VS Code
 .vscode/
+
+# Kotlin/Java bytecode
+*.class
+
+# Native build
+*.o
+*.so
+*.a
