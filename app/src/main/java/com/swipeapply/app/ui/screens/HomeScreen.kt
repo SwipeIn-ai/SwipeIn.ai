@@ -180,6 +180,8 @@ fun HomeScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             HomeTopBar(
                 stats = viewModel.getStats(),
+                currentStreak = uiState.currentStreak,
+                todaySwipeCount = uiState.todaySwipeCount,
                 onUndo = {
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.undoLastSwipe()
@@ -366,38 +368,103 @@ fun HomeScreen(
 @Composable
 private fun HomeTopBar(
     stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
+    currentStreak: Int,
+    todaySwipeCount: Int,
     onUndo: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    val dailyGoal = com.swipeapply.app.data.manager.StreakManager.DAILY_GOAL
+    val goalReached = todaySwipeCount >= dailyGoal
+    val progress = (todaySwipeCount.toFloat() / dailyGoal).coerceIn(0f, 1f)
+
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "SwipeApply",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold
-            )
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SwipeApply",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                AnimatedVisibility(
-                    visible = stats.interested > 0,
-                    enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
-                    exit = scaleOut() + fadeOut()
-                ) {
-                    StatBadge(count = stats.interested, color = AccentGreen)
-                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Streak pill — only shown once user has started a streak
+                    AnimatedVisibility(
+                        visible = currentStreak > 0,
+                        enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
+                        exit = scaleOut() + fadeOut()
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (goalReached)
+                                AccentGreen.copy(alpha = 0.15f)
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDD25",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = "$currentStreak",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (goalReached) AccentGreen else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "\u2022",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "$todaySwipeCount/$dailyGoal",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (goalReached) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
 
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    AnimatedVisibility(
+                        visible = stats.interested > 0,
+                        enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
+                        exit = scaleOut() + fadeOut()
+                    ) {
+                        StatBadge(count = stats.interested, color = AccentGreen)
+                    }
+
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            }
+
+            // Daily goal progress bar — subtle, only visible when streak is active
+            AnimatedVisibility(
+                visible = currentStreak > 0,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(2.dp),
+                    color = if (goalReached) AccentGreen else GradientStart,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             }
         }
     }
