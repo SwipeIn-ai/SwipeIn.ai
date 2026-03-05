@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
+import com.swipeapply.app.data.manager.StreakManager
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.data.model.SwipeResult
@@ -49,7 +50,9 @@ data class HomeUiState(
     val isRankingEnabled: Boolean = true,
     val isRanking: Boolean = false,
     val userProfile: UserProfile? = null,
-    val searchQuery: String? = null  // Dynamic search based on profile
+    val searchQuery: String? = null,  // Dynamic search based on profile
+    val currentStreak: Int = 0,
+    val todaySwipeCount: Int = 0
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,7 +62,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         apiKey = ApiConfig.FINDWORK_API_KEY
     )
 
-    private val _uiState = MutableStateFlow(HomeUiState())
+    private val streakManager = StreakManager.getInstance(application.applicationContext)
+
+    private val _uiState = MutableStateFlow(
+        HomeUiState(
+            currentStreak = streakManager.currentStreak,
+            todaySwipeCount = streakManager.todaySwipeCount
+        )
+    )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val jsonParser = Json {
@@ -359,6 +369,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.recordSwipe(card.id, direction.name)
 
+            val (newStreak, newTodayCount) = streakManager.recordSwipe()
+
             val nextJob = repository.getNextJobFromQueue(
                 search = searchQuery,
                 location = ApiConfig.DEFAULT_LOCATION,
@@ -382,7 +394,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     interestedCards = if (direction == SwipeDirection.RIGHT) state.interestedCards + card else state.interestedCards,
                     skippedCards = if (direction == SwipeDirection.LEFT) state.skippedCards + card else state.skippedCards,
                     undoHistory = state.undoHistory + undoableAction,
-                    canUndo = true
+                    canUndo = true,
+                    currentStreak = newStreak,
+                    todaySwipeCount = newTodayCount
                 )
             }
         }
