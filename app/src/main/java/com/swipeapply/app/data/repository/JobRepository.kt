@@ -293,7 +293,9 @@ class JobRepository(private val context: Context, private val apiKey: String) {
 
     fun hasMorePages() = hasMorePages
     fun getTotalCount() = totalCount
-    suspend fun getJobCardById(id: String): JobCard? = null
+    suspend fun getJobCardById(id: String): JobCard? = withContext(Dispatchers.IO) {
+        jobDao.getJobById(id)?.toJobCard()
+    }
     
     /**
      * Check if user profile exists in database
