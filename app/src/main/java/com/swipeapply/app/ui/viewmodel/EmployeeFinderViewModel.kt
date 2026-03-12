@@ -75,21 +75,17 @@ class EmployeeFinderViewModel : ViewModel() {
      * This means X-User-ID will always be valid on the backend, ending the 500 errors.
      */
     private suspend fun getCurrentUserId(): String {
-        return try {
-            SupabaseClient.client.auth.awaitInitialization()
-            val user = SupabaseClient.client.auth.currentUserOrNull()
-            val supabaseId = user?.id
-            val email = user?.email
-            Log.d(TAG, "Supabase user: id=$supabaseId, email=$email")
-            UserSyncRepository.syncAndGetUserId(
-                supabaseId = supabaseId,
-                email = email,
-                displayName = user?.userMetadata?.get("full_name")?.toString()
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to get/sync user ID: ${e.message}")
-            UserSyncRepository.syncAndGetUserId(null, null)
-        }
+        SupabaseClient.client.auth.awaitInitialization()
+        val user = SupabaseClient.client.auth.currentUserOrNull()
+        val supabaseId = user?.id
+        val email = user?.email
+        Log.d(TAG, "Supabase user: id=$supabaseId, email=$email")
+        // Throws IllegalStateException if supabaseId is null (not authenticated)
+        return UserSyncRepository.syncAndGetUserId(
+            supabaseId = supabaseId,
+            email = email,
+            displayName = user?.userMetadata?.get("full_name")?.toString()
+        )
     }
 
     /**
@@ -114,36 +110,47 @@ class EmployeeFinderViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            val userId = getCurrentUserId()
-            
-            // Clean company name: remove suffixes, extract domain-friendly identifier
-            val cleanedIdentifier = cleanCompanyIdentifier(companyName)
-            Log.d(TAG, "Loading employees for '$companyName' → identifier: '$cleanedIdentifier'")
+            try {
+                val userId = getCurrentUserId()
 
-            val result = repository.fetchEmployees(cleanedIdentifier, userId)
+                // Clean company name: remove suffixes, extract domain-friendly identifier
+                val cleanedIdentifier = cleanCompanyIdentifier(companyName)
+                Log.d(TAG, "Loading employees for '$companyName' → identifier: '$cleanedIdentifier'")
 
-            result.onSuccess { response ->
-                Log.d(TAG, "✅ Loaded ${response.employees.size} employees")
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        employees = response.employees,
-                        companyDomain = response.companyDomain,
-                        remainingSwipes = response.remainingSwipes,
-                        totalAvailable = response.totalAvailable,
-                        source = response.source,
-                        isEmpty = response.employees.isEmpty(),
-                        error = if (response.employees.isEmpty()) 
-                            response.message ?: "No employee contacts found for this company" 
-                        else null
-                    )
+                val result = repository.fetchEmployees(cleanedIdentifier, userId)
+
+                result.onSuccess { response ->
+                    Log.d(TAG, "✅ Loaded ${response.employees.size} employees")
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            employees = response.employees,
+                            companyDomain = response.companyDomain,
+                            remainingSwipes = response.remainingSwipes,
+                            totalAvailable = response.totalAvailable,
+                            source = response.source,
+                            isEmpty = response.employees.isEmpty(),
+                            error = if (response.employees.isEmpty())
+                                response.message ?: "No employee contacts found for this company"
+                            else null
+                        )
+                    }
+                }.onFailure { exception ->
+                    Log.e(TAG, "❌ Failed: ${exception.message}")
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = exception.message ?: "Failed to load employee contacts",
+                            isEmpty = true
+                        )
+                    }
                 }
-            }.onFailure { exception ->
-                Log.e(TAG, "❌ Failed: ${exception.message}")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Auth/setup error: ${e.message}")
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = exception.message ?: "Failed to load employee contacts",
+                        error = e.message ?: "Authentication required. Please sign in.",
                         isEmpty = true
                     )
                 }

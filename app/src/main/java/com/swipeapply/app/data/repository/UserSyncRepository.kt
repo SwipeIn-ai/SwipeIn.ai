@@ -45,21 +45,23 @@ object UserSyncRepository {
      * used as X-User-ID in all employee API calls.
      *
      * Behaviour:
-     * - If [supabaseId] is null/blank (guest mode) returns the dev fallback UUID.
+     * - If [supabaseId] is null/blank (user not authenticated) throws [IllegalStateException].
      * - If already synced this session, returns the cached result.
      * - Calls POST /api/v1/users/sync and caches the returned userId.
      * - On any network failure, falls back to [supabaseId] itself (which will work
      *   once the user has been synced at least once).
+     *
+     * @throws IllegalStateException if called without a valid Supabase session.
      */
     suspend fun syncAndGetUserId(
         supabaseId: String?,
         email: String?,
         displayName: String? = null
     ): String = withContext(Dispatchers.IO) {
-        // Guest / not logged in
+        // Not authenticated — do NOT fall back to any hardcoded ID
         if (supabaseId.isNullOrBlank()) {
-            Log.w(TAG, "No Supabase ID — using dev fallback")
-            return@withContext DEV_FALLBACK_ID
+            Log.e(TAG, "syncAndGetUserId called with no Supabase ID — user is not authenticated")
+            throw IllegalStateException("User is not authenticated. Please sign in to search employees.")
         }
 
         // Already synced this session
@@ -105,5 +107,4 @@ object UserSyncRepository {
         syncedUserId = null
     }
 
-    private const val DEV_FALLBACK_ID = "0f1b204c-4b01-448d-9b76-0a18828b114b"
 }
