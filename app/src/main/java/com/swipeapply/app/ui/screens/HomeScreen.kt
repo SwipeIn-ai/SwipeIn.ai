@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -272,6 +273,10 @@ fun HomeScreen(
                     onRequestIntro = {
                         viewModel.dismissBottomSheet()
                         onRequestIntro(uiState.selectedCard!!)
+                    },
+                    onFindPeople = {
+                        viewModel.dismissBottomSheet()
+                        onNavigateToEmployeeFinder(uiState.selectedCard!!.company.name)
                     }
                 )
             }
@@ -768,7 +773,7 @@ private fun extractDomain(url: String?): String? {
 }
 
 @Composable
-private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onRequestIntro: () -> Unit) {
+private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onRequestIntro: () -> Unit, onFindPeople: () -> Unit) {
     val domain = extractDomain(jobCard.company.website) ?: (jobCard.company.name.replace(" ", "").lowercase() + ".com")
     val displayUrl = "https://logos.hunter.io/$domain"
 
@@ -829,15 +834,55 @@ private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onReques
             }
         }
         Spacer(modifier = Modifier.height(20.dp))
-        Box(
-            modifier = Modifier.fillMaxWidth().height(56.dp).background(
-                brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
-                shape = RoundedCornerShape(16.dp)
-            ).clip(RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TextButton(onClick = onRequestIntro, modifier = Modifier.fillMaxSize()) {
-                Text(text = "Request intro template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+            // Secondary — Find People
+            Surface(
+                onClick = onFindPeople,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Group,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Find people",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Primary — Make your move
+            Box(
+                modifier = Modifier.weight(1f).height(56.dp).background(
+                    brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
+                    shape = RoundedCornerShape(16.dp)
+                ).clip(RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                TextButton(onClick = onRequestIntro, modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        text = "Make your move",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(32.dp))

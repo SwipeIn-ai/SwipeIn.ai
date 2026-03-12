@@ -5,11 +5,19 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +37,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,33 +89,56 @@ fun IntroTemplateScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(jobCard) {
-        viewModel.initializeTemplate(
-            subject = jobCard.introTemplate.subject,
-            body = jobCard.introTemplate.body
-        )
+        viewModel.initializeAndGenerate(jobCard)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Intro Template",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Outreach",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        // AI badge
+                        AnimatedVisibility(visible = uiState.aiGenerated, enter = fadeIn() + scaleIn(), exit = fadeOut()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = GradientStart.copy(alpha = 0.12f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = GradientStart, modifier = Modifier.size(12.dp))
+                                    Text("AI", style = MaterialTheme.typography.labelSmall, color = GradientStart, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                actions = {
+                    // Regenerate button
+                    IconButton(
+                        onClick = { viewModel.regenerate() },
+                        enabled = !uiState.isGenerating
+                    ) {
+                        if (uiState.isGenerating) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = GradientStart)
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Regenerate with AI", tint = GradientStart)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -122,12 +156,49 @@ fun IntroTemplateScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            EmailPreviewCard(
-                subject = uiState.subject,
-                body = uiState.body,
-                onSubjectChange = { viewModel.updateSubject(it) },
-                onBodyChange = { viewModel.updateBody(it) }
-            )
+            // Error banner
+            AnimatedVisibility(visible = uiState.generationError != null, enter = fadeIn(), exit = fadeOut()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = uiState.generationError ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            // Email card with generating shimmer border
+            Box(modifier = Modifier.fillMaxWidth()) {
+                val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+                val shimmerAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.3f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
+                    label = "shimmerAlpha"
+                )
+                val borderColor = if (uiState.isGenerating)
+                    GradientStart.copy(alpha = shimmerAlpha)
+                else
+                    androidx.compose.ui.graphics.Color.Transparent
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .border(1.5.dp, borderColor, RoundedCornerShape(20.dp))
+                ) {
+                    EmailPreviewCard(
+                        subject = uiState.subject,
+                        body = uiState.body,
+                        onSubjectChange = { viewModel.updateSubject(it) },
+                        onBodyChange = { viewModel.updateBody(it) }
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -143,7 +214,8 @@ fun IntroTemplateScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "You will send this manually via your email or LinkedIn.",
+                text = if (uiState.aiGenerated) "AI-personalised based on your profile. Edit freely."
+                        else "Edit the template above, then copy and send.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.fillMaxWidth(),
