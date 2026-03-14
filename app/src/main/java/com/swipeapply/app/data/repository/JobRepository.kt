@@ -104,6 +104,10 @@ class JobRepository(private val context: Context, private val apiKey: String) {
 
         // 1. Try filling queue from API
         if (jobQueue.isEmpty()) {
+            // Reset pagination state so we always get a fresh fetch attempt
+            currentPage = 1
+            hasMorePages = true
+            isFallbackMode = false
             fetchAndQueueJobs(search, location, remote)
         }
 
@@ -190,7 +194,13 @@ class JobRepository(private val context: Context, private val apiKey: String) {
                 totalCount = response.count
 
                 // 1. Map to Entities (Clean HTML happens here via Mapper)
-                val jobEntities = response.results.map { it.toEntity() }
+                // Use mapNotNull so one bad job doesn't kill the entire page
+                val jobEntities = response.results.mapNotNull { 
+                    try { it.toEntity() } catch (e: Exception) {
+                        Log.w(TAG, "Skipping malformed job: ${e.message}")
+                        null
+                    }
+                }
                 
                 // 2. SAVE TO DB (Persistence)
                 if (jobEntities.isNotEmpty()) {

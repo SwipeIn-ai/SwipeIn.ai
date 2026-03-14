@@ -189,20 +189,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // Remove duplicates and empty strings - NO LIMIT on count
+        // Remove duplicates and empty strings, take top keywords for API compatibility
         val uniqueKeywords = allKeywords
             .filter { it.isNotBlank() && it.length > 1 }
             .distinct()
+            .take(5)  // Limit to top 5 keywords — FindWork API uses simple keyword matching
         
         if (uniqueKeywords.isEmpty()) {
             Log.d(TAG, "No keywords found in profile, using default search")
             return null
         }
         
-        // Join ALL keywords with " OR " for MAXIMUM results
-        // This ensures C++ AND Python jobs both show up
-        val query = uniqueKeywords.joinToString(" OR ")
-        Log.d(TAG, "🔍 Full keyword list (${uniqueKeywords.size} keywords): $uniqueKeywords")
+        // Join with spaces — FindWork API treats space-separated terms as keyword search
+        val query = uniqueKeywords.joinToString(" ")
+        Log.d(TAG, "🔍 Keywords (${uniqueKeywords.size}): $uniqueKeywords")
         Log.d(TAG, "🔍 Search query: $query")
         return query
     }

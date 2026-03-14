@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 object ResumeParser {
     private const val TAG = "ResumeParser"
     private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    private const val MODEL = "stepfun/step-3.5-flash:free'"
+    private const val MODEL = "google/gemma-3-4b-it:free"
     
     // OkHttp client with longer timeouts for AI responses
     private val httpClient by lazy {
@@ -131,7 +131,10 @@ object ResumeParser {
             val choices = jsonResponse.optJSONArray("choices")
             if (choices != null && choices.length() > 0) {
                 val message = choices.getJSONObject(0).optJSONObject("message")
-                message?.optString("content")
+                // Try content first, fall back to reasoning field (for reasoning models)
+                val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
+                    ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
+                content
             } else {
                 Log.e(TAG, "No choices in OpenRouter response")
                 null
