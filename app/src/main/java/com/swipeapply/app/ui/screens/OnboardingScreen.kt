@@ -2,11 +2,17 @@ package com.swipeapply.app.ui.screens
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,13 +27,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -46,17 +47,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.swipeapply.app.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
@@ -65,16 +69,19 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-private val BrandPrimary = Color(0xFF0A66C2)
-private val BrandSecondary = Color(0xFFE8F3FF)
-private val BrandBackground = Color(0xFFF8F9FA)
-private val BrandForeground = Color(0xFF1A1D21)
-private val BrandMuted = Color(0xFFF0F2F5)
-private val BrandMutedForeground = Color(0xFF666E76)
-private val BrandBorder = Color(0xFFDEE2E6)
-private val BrandDestructive = Color(0xFFDC3545)
-private val Chart2 = Color(0xFFFF5F6D)
-private val Chart3 = Color(0xFFFFC371)
+// ─── Brand Palette ────────────────────────────────────────────────────────────
+private val LinkedInBlue   = Color(0xFF0A66C2)
+private val LinkedInSurface= Color(0xFFE8F3FF)
+private val PageBg         = Color(0xFFF5F7FA)
+private val DarkText       = Color(0xFF1A1D21)
+private val MutedText      = Color(0xFF6B7280)
+private val BorderColor    = Color(0xFFE5E7EB)
+private val TinderRed      = Color(0xFFFF4458)
+private val AccentOrange   = Color(0xFFFF6B35)
+private val GoogleRed      = Color(0xFFDB4437)
+private val GoogleGreen    = Color(0xFF0F9D58)
+private val GoogleBlue     = Color(0xFF4285F4)
+private val GoogleYellow   = Color(0xFFF4B400)
 
 object LinkedInOidc : OAuthProvider() {
     override val name = "linkedin_oidc"
@@ -103,7 +110,7 @@ fun OnboardingScreen(
                         onContinue()
                     }
                 }
-                else -> { 
+                else -> {
                     isJustLoggedOut = false
                     isGoogleLoading = false
                     isLinkedInLoading = false
@@ -112,71 +119,98 @@ fun OnboardingScreen(
         }
     }
 
-    val animatedAlpha = remember { Animatable(0f) }
-    val animatedOffset = remember { Animatable(30f) }
+    val alpha = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(40f) }
 
     LaunchedEffect(Unit) {
-        launch { animatedAlpha.animateTo(1f, tween(600, easing = EaseOutCubic)) }
-        launch { animatedOffset.animateTo(0f, tween(600, easing = EaseOutCubic)) }
+        launch { alpha.animateTo(1f, tween(700, easing = EaseOutCubic)) }
+        launch { offsetY.animateTo(0f, tween(700, easing = EaseOutCubic)) }
     }
+
+    // Floating blob animation
+    val infiniteTransition = rememberInfiniteTransition(label = "blobs")
+    val blobOffset by infiniteTransition.animateFloat(
+        initialValue = -12f,
+        targetValue = 12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blobFloat"
+    )
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier.fillMaxSize(),
-        containerColor = BrandBackground
+        containerColor = PageBg
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Decorative Background Blobs
+            // ── Decorative gradient background ────────────────────────────────
             Box(
                 modifier = Modifier
-                    .offset(x = (-60).dp, y = (-80).dp)
-                    .size(300.dp)
+                    .fillMaxSize()
                     .background(
-                        color = Chart3.copy(alpha = 0.15f),
-                        shape = CircleShape
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFEEF4FF),
+                                PageBg,
+                                Color(0xFFFFF0F3)
+                            )
+                        )
                     )
-                    .blurEffect()
             )
-            
+
+            // ── Floating colour blobs ─────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .offset(x = (-48).dp, y = (blobOffset - 40).dp)
+                    .size(260.dp)
+                    .background(LinkedInBlue.copy(alpha = 0.06f), CircleShape)
+            )
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .offset(x = 60.dp, y = 60.dp)
-                    .size(250.dp)
-                    .background(
-                        color = Chart2.copy(alpha = 0.1f),
-                        shape = CircleShape
-                    )
-                    .blurEffect()
+                    .offset(x = 48.dp, y = (-blobOffset + 20).dp)
+                    .size(220.dp)
+                    .background(TinderRed.copy(alpha = 0.07f), CircleShape)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = (-30).dp, y = (blobOffset).dp)
+                    .size(160.dp)
+                    .background(AccentOrange.copy(alpha = 0.06f), CircleShape)
             )
 
+            // ── Main content ──────────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 28.dp)
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .alpha(animatedAlpha.value)
-                    .offset(y = animatedOffset.value.dp),
+                    .alpha(alpha.value)
+                    .offset(y = offsetY.value.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.weight(0.15f))
 
-                // Logo & Header Section
-                SwipeInLogoHeader()
+                Spacer(modifier = Modifier.weight(0.05f))
 
-                Spacer(modifier = Modifier.weight(0.1f))
+                // ── App Logo (animated hero) ──────────────────────────────────
+                AnimatedLogoHero()
 
-                // Center Illustration (Abstract Swipe Cards)
-                CenterIllustration()
+                Spacer(modifier = Modifier.weight(0.04f))
 
-                Spacer(modifier = Modifier.weight(0.15f))
+                // ── Tagline ───────────────────────────────────────────────────
+                TaglineSection()
 
-                // Action Buttons Section
+                Spacer(modifier = Modifier.weight(0.12f))
+
+                // ── Sign-in Buttons ─────────────────────────────────────────
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -219,25 +253,14 @@ fun OnboardingScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                TextButton(
-                    onClick = { onSkipLogin() },
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text(
-                        "Skip for now (Dev Mode)",
-                        color = BrandMutedForeground,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
 
-                // Legal Footer
+                // ── Legal Footer ─────────────────────────────────────────────
                 Text(
                     text = "By continuing, you agree to our Terms of Service and Privacy Policy.",
                     style = MaterialTheme.typography.labelSmall,
-                    color = BrandMutedForeground,
+                    color = MutedText.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 24.dp).padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(bottom = 20.dp, top = 4.dp).padding(horizontal = 8.dp),
                     lineHeight = 16.sp
                 )
             }
@@ -245,201 +268,160 @@ fun OnboardingScreen(
     }
 }
 
-// Helper for soft blur without heavy performance hit
 @Composable
-private fun Modifier.blurEffect() = this.graphicsLayer {
-    // Basic graphic layer for composition, since actual blur requires RenderEffect (API 31+)
-    // We achieve a soft look by just using low alpha circles.
-    alpha = 0.8f
-}
+private fun AnimatedLogoHero() {
+    val infiniteTransition = rememberInfiniteTransition(label = "logoAnim")
 
-@Composable
-private fun SwipeInLogoHeader() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 16.dp)
+    val pulseScale1 by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "pulse1"
+    )
+    val pulseScale2 by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.30f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = EaseInOutSine, delayMillis = 400),
+            repeatMode = RepeatMode.Reverse
+        ), label = "pulse2"
+    )
+    val pulseAlpha2 by infiniteTransition.animateFloat(
+        initialValue = 0.18f, targetValue = 0.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = EaseInOutSine, delayMillis = 400),
+            repeatMode = RepeatMode.Reverse
+        ), label = "alpha2"
+    )
+    val floatY by infiniteTransition.animateFloat(
+        initialValue = -6f, targetValue = 6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "float"
+    )
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000, easing = FastOutSlowInEasing)
+        ), label = "rotation"
+    )
+
+    // Adaptive sizing: fills available width up to a max, scales all rings proportionally
+    BoxWithConstraints(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        val containerSize = minOf(maxWidth * 0.72f, 260.dp)
+        val outerRing    = containerSize * 0.91f
+        val midRing      = containerSize * 0.76f
+        val spinRing     = containerSize * 0.70f
+        val innerCircle  = containerSize * 0.636f
+        val logoCard     = containerSize * 0.582f
+        val logoImage    = containerSize * 0.473f
+        val cornerRadius = containerSize * 0.164f
+        val logoCorner   = containerSize * 0.127f
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(containerSize)
         ) {
-            Text(
-                text = "Swipe",
-                fontSize = 44.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = BrandForeground,
-                letterSpacing = (-1).sp
-            )
+            // Outermost pulse ring
             Box(
                 modifier = Modifier
-                    .padding(start = 6.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(BrandPrimary)
-                    .padding(horizontal = 10.dp, vertical = 2.dp)
-                    .shadow(elevation = 2.dp, shape = RoundedCornerShape(12.dp)),
+                    .size(outerRing)
+                    .graphicsLayer { scaleX = pulseScale2; scaleY = pulseScale2; alpha = pulseAlpha2 }
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                LinkedInBlue.copy(alpha = 0.6f),
+                                TinderRed.copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        ),
+                        CircleShape
+                    )
+            )
+            // Mid pulse ring
+            Box(
+                modifier = Modifier
+                    .size(midRing)
+                    .graphicsLayer { scaleX = pulseScale1; scaleY = pulseScale1; alpha = 0.13f }
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                LinkedInBlue,
+                                AccentOrange.copy(alpha = 0.5f),
+                                Color.Transparent
+                            )
+                        ),
+                        CircleShape
+                    )
+            )
+            // Spinning arc ring
+            Box(
+                modifier = Modifier
+                    .size(spinRing)
+                    .graphicsLayer { rotationZ = rotationAngle }
+                    .background(
+                        Brush.sweepGradient(
+                            listOf(
+                                LinkedInBlue.copy(alpha = 0.0f),
+                                LinkedInBlue.copy(alpha = 0.5f),
+                                TinderRed.copy(alpha = 0.6f),
+                                AccentOrange.copy(alpha = 0.4f),
+                                LinkedInBlue.copy(alpha = 0.0f)
+                            )
+                        ),
+                        CircleShape
+                    )
+            )
+            // Inner background circle
+            Box(
+                modifier = Modifier
+                    .size(innerCircle)
+                    .background(PageBg, CircleShape)
+            )
+            // Floating logo card
+            Box(
+                modifier = Modifier
+                    .size(logoCard)
+                    .offset(y = floatY.dp)
+                    .shadow(
+                        elevation = 24.dp,
+                        shape = RoundedCornerShape(cornerRadius),
+                        spotColor = LinkedInBlue.copy(alpha = 0.30f)
+                    )
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "in",
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    letterSpacing = (-1).sp
+                AsyncImage(
+                    model = "android.resource://com.swipeapply.app/drawable/app_logo",
+                    contentDescription = "App Logo",
+                    modifier = Modifier
+                        .size(logoImage)
+                        .clip(RoundedCornerShape(logoCorner)),
+                    contentScale = ContentScale.Fit
                 )
             }
         }
-        Text(
-            text = "Swipe Your Way to Referrals",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium,
-            color = BrandMutedForeground,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
 @Composable
-private fun CenterIllustration() {
-    Box(
-        modifier = Modifier
-            .size(320.dp)
-            .padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Background Card (Swiped Left)
-        Surface(
-            modifier = Modifier
-                .width(220.dp)
-                .height(300.dp)
-                .offset(x = (-24).dp, y = 12.dp)
-                .rotate(-8f)
-                .scale(0.9f)
-                .alpha(0.7f),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, BrandBorder.copy(alpha = 0.5f)),
-            shadowElevation = 8.dp
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier.size(64.dp).background(BrandMuted, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("A", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = BrandMutedForeground)
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-                Box(modifier = Modifier.width(140.dp).height(14.dp).background(BrandMuted, RoundedCornerShape(8.dp)))
-                Spacer(modifier = Modifier.height(12.dp))
-                Box(modifier = Modifier.width(100.dp).height(14.dp).background(BrandMuted, RoundedCornerShape(8.dp)))
-            }
-        }
-
-        // Foreground Card (Active)
-        Surface(
-            modifier = Modifier
-                .width(250.dp)
-                .height(340.dp)
-                .rotate(2f),
-            shape = RoundedCornerShape(28.dp),
-            color = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, BrandBorder.copy(alpha = 0.8f)),
-            shadowElevation = 24.dp
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Top section
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            shadowElevation = 2.dp,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, BrandBorder)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("G", fontSize = 24.sp, fontWeight = FontWeight.Black, color = BrandForeground)
-                            }
-                        }
-                        
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = BrandSecondary,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.2f))
-                        ) {
-                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Person, contentDescription = null, tint = BrandPrimary, modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Referral", color = BrandPrimary, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Senior Frontend Engineer", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = BrandForeground)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("Google • 3 days ago", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = BrandMutedForeground)
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = BrandMuted.copy(alpha = 0.5f)) {
-                            Text("Mountain View, CA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = BrandForeground, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                        }
-                        Surface(shape = RoundedCornerShape(8.dp), color = BrandSecondary.copy(alpha = 0.4f)) {
-                            Text("Remote", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = BrandPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Fading bottom content + Buttons
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(80.dp),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.White)))
-                    )
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(44.dp),
-                            shape = CircleShape,
-                            color = Color.White,
-                            shadowElevation = 8.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Close, null, tint = Color(0xFF657786), modifier = Modifier.size(20.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = CircleShape,
-                            color = Color.White,
-                            shadowElevation = 8.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Check, null, tint = Color(0xFFFF5252), modifier = Modifier.size(28.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+private fun TaglineSection() {
+    Text(
+        text = "Where Tinder Meets LinkedIn.",
+        fontSize = 26.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = DarkText,
+        textAlign = TextAlign.Center,
+        lineHeight = 34.sp,
+        modifier = Modifier.padding(horizontal = 8.dp)
+    )
 }
+
 
 @Composable
 private fun GoogleSignInButton(
@@ -451,36 +433,57 @@ private fun GoogleSignInButton(
         onClick = { if (!isLoading) onClick() },
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(28.dp),
+            .height(56.dp)
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, BrandBorder),
-        shadowElevation = 2.dp
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(22.dp),
                     strokeWidth = 2.dp,
-                    color = BrandForeground
+                    color = DarkText
                 )
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Simple G logo mock
+                    // Colourful Google "G"
                     Text(
-                        text = "G",
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFDB4437),
-                        fontSize = 20.sp
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = GoogleBlue))   { append("G") }
+                        },
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = GoogleRed))    { append("o") }
+                            withStyle(SpanStyle(color = GoogleYellow))  { append("o") }
+                            withStyle(SpanStyle(color = GoogleBlue))   { append("g") }
+                            withStyle(SpanStyle(color = GoogleGreen))  { append("l") }
+                            withStyle(SpanStyle(color = GoogleRed))    { append("e") }
+                        },
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .height(20.dp)
+                            .width(1.dp),
+                        color = BorderColor
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
                         text = "Continue with Google",
-                        fontSize = 16.sp,
-                        color = BrandForeground,
+                        fontSize = 15.sp,
+                        color = DarkText,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -499,33 +502,64 @@ private fun LinkedInSignInButton(
         onClick = { if (!isLoading) onClick() },
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = BrandPrimary,
-        shadowElevation = 4.dp
+            .height(56.dp)
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = LinkedInBlue.copy(alpha = 0.35f)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        color = LinkedInBlue
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(LinkedInBlue, Color(0xFF0D7FDD))
+                    )
+                )
+        ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(22.dp),
                     strokeWidth = 2.dp,
                     color = Color.White
                 )
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "in",
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        fontSize = 20.sp
+                    // LinkedIn "in" badge
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "in",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = LinkedInBlue,
+                            fontSize = 14.sp,
+                            letterSpacing = (-0.5).sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(20.dp)
+                            .background(Color.White.copy(alpha = 0.35f))
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
                         text = "Continue with LinkedIn",
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )

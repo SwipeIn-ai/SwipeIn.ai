@@ -87,6 +87,13 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    val context = LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.parseResume(context, it) }
+    }
+
     LaunchedEffect(state.saveSuccess, state.error) {
         if (state.saveSuccess) {
             snackbarHostState.showSnackbar("Profile saved successfully!")
@@ -241,7 +248,8 @@ fun ProfileScreen(
                                 onPhoneChange = viewModel::updatePhone,
                                 onBioChange = viewModel::updateBio,
                                 onSkillsChange = viewModel::updateSkills,
-                                onTechStackChange = viewModel::updateTechStack
+                                onTechStackChange = viewModel::updateTechStack,
+                                onUploadResumeClick = { launcher.launch("application/pdf") }
                             )
                         }
 
@@ -464,7 +472,8 @@ private fun EditModeContent(
     onPhoneChange: (String) -> Unit,
     onBioChange: (String) -> Unit,
     onSkillsChange: (String) -> Unit,
-    onTechStackChange: (String) -> Unit
+    onTechStackChange: (String) -> Unit,
+    onUploadResumeClick: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         OutlinedTextField(
@@ -536,8 +545,17 @@ private fun EditModeContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
+        Button(
+            onClick = onUploadResumeClick,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        ) {
+            Icon(androidx.compose.material.icons.Icons.Default.Edit, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Re-upload Resume to Auto-fill")
+        }
+
         Text(
-            text = "Note: Education, Experience, and Projects can be edited by re-uploading your resume.",
+            text = "Note: Uploading a new resume will extract and replace existing education, experience, and projects.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

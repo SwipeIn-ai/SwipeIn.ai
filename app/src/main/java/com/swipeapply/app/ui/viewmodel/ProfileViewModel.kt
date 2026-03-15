@@ -303,6 +303,51 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
+     * Parse and update profile with new resume
+     */
+    fun parseResume(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null, saveSuccess = false) }
+
+            val result = com.swipeapply.app.utils.ResumeParserV2.parseResume(
+                context = context,
+                uri = uri,
+                onProgress = { _, _ -> }
+            )
+
+            if (result != null) {
+                // Keep the old user name/email if parser didn't find them and they exist
+                val mergedProfile = result.copy(
+                    fullName = result.fullName.ifEmpty { _uiState.value.profile?.fullName ?: "" },
+                    email = result.email.ifEmpty { _uiState.value.profile?.email ?: "" },
+                    phone = result.phone.ifEmpty { _uiState.value.profile?.phone ?: "" },
+                )
+                
+                _uiState.update {
+                    it.copy(
+                        profile = mergedProfile,
+                        isLoading = false,
+                        editFullName = mergedProfile.fullName,
+                        editEmail = mergedProfile.email,
+                        editPhone = mergedProfile.phone,
+                        editBio = mergedProfile.bio.ifEmpty { it.editBio },
+                        editSkills = mergedProfile.skills.joinToString(", ").ifEmpty { it.editSkills },
+                        editTechStack = mergedProfile.techStack.joinToString(", ").ifEmpty { it.editTechStack },
+                        isEditMode = true
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Could not parse resume."
+                    )
+                }
+            }
+        }
+    }
+
+    /**
      * Get current profile for AI ranking
      */
     fun getCurrentProfile(): UserProfile? = _uiState.value.profile

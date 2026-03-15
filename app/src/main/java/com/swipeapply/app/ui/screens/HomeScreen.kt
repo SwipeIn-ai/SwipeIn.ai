@@ -98,7 +98,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -390,7 +393,12 @@ private fun HomeTopBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SwipeApply",
+                    text = buildAnnotatedString {
+                        append("Swipe")
+                        withStyle(style = SpanStyle(color = Color(0xFF0A66C2))) {
+                            append("In")
+                        }
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
