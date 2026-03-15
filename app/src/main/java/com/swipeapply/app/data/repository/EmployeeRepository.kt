@@ -49,7 +49,15 @@ class EmployeeRepository {
                 Log.d(TAG, "📊 Remaining swipes: ${body.remainingSwipes}")
                 Result.success(body)
             } else {
-                val errorMsg = "API Error ${response.code()}: ${response.message()}"
+                // Try to parse the JSON error body for a user-friendly message
+                val errorBody = response.errorBody()?.string()
+                val serverMessage = try {
+                    val json = org.json.JSONObject(errorBody ?: "")
+                    json.optString("message", "").takeIf { it.isNotBlank() }
+                } catch (_: Exception) { null }
+                
+                val errorMsg = serverMessage
+                    ?: "API Error ${response.code()}: ${response.message()}"
                 Log.e(TAG, "❌ $errorMsg")
                 Result.failure(Exception(errorMsg))
             }

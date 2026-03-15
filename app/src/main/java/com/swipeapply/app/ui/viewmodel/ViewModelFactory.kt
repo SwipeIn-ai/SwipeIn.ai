@@ -27,6 +27,10 @@ class ViewModelFactory(
                 ProfileViewModel(application) as T
             }
 
+            modelClass.isAssignableFrom(ReferralEmailViewModel::class.java) -> {
+                ReferralEmailViewModel(application) as T
+            }
+
             else -> throw IllegalArgumentException(
                 "Unknown ViewModel class: ${modelClass.name}"
             )

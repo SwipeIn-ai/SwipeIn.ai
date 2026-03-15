@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -142,7 +143,10 @@ fun ProfileCreationScreen(
         ) {
             when {
                 state.isLoading -> {
-                    ResumeAnalyzingState()
+                    ResumeAnalyzingState(
+                        progress = state.parseProgress,
+                        stage = state.parseStage
+                    )
                 }
                 state.profile == null -> {
                     ResumeUploadState(
@@ -316,7 +320,18 @@ private fun ResumeUploadState(
 }
 
 @Composable
-private fun ResumeAnalyzingState() {
+private fun ResumeAnalyzingState(
+    progress: Float,
+    stage: String
+) {
+    // Smoothly animate the progress bar
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "progressAnim"
+    )
+    val percentText = "${(animatedProgress * 100).toInt()}%"
+
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -330,40 +345,157 @@ private fun ResumeAnalyzingState() {
             shadowElevation = 12.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Scanner Icon
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = BrandSecondary,
-                    border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.2f)),
-                    modifier = Modifier.size(56.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Description, null, tint = BrandPrimary.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
-                        // Simulated scanner line
-                        val infiniteTransition = rememberInfiniteTransition()
-                        val offset by infiniteTransition.animateFloat(
-                            initialValue = 0f, targetValue = 56f,
-                            animationSpec = infiniteRepeatable(animation = tween(1500, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse)
+                    // Scanner Icon
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = BrandSecondary,
+                        border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.2f)),
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Description, null, tint = BrandPrimary.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
+                            // Scanner line
+                            val infiniteTransition = rememberInfiniteTransition()
+                            val offset by infiniteTransition.animateFloat(
+                                initialValue = 0f, targetValue = 56f,
+                                animationSpec = infiniteRepeatable(animation = tween(1500, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse)
+                            )
+                            Box(modifier = Modifier.fillMaxWidth().height(2.dp).offset(y = (offset - 28).dp).background(BrandPrimary).shadow(8.dp, spotColor = BrandPrimary))
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Parsing Resume",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BrandForeground
                         )
-                        Box(modifier = Modifier.fillMaxWidth().height(2.dp).offset(y = (offset-28).dp).background(BrandPrimary).shadow(8.dp, spotColor = BrandPrimary))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Offline • No AI • 100% Accurate",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = BrandPrimary
+                        )
+                    }
+
+                    // Percentage circle
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(52.dp)) {
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.size(52.dp),
+                            color = BrandPrimary,
+                            trackColor = BrandMuted,
+                            strokeWidth = 4.dp
+                        )
+                        Text(
+                            text = percentText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BrandPrimary
+                        )
                     }
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                        Text("Analyzing Profile", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = BrandForeground)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Linear progress bar
+                Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(BrandMuted, CircleShape)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedProgress)
+                            .height(10.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(BrandPrimary, Chart4)
+                                ),
+                                CircleShape
+                            )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Stage label
+                Text(
+                    text = stage.ifBlank { "Initializing…" },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandMutedForeground,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Stage checklist (shows completed stages)
+                val stages = listOf(
+                    0.10f to "PDF text extraction",
+                    0.20f to "Section detection",
+                    0.35f to "Contact information",
+                    0.50f to "Skills & technologies",
+                    0.70f to "Work experience",
+                    0.85f to "Education",
+                    0.95f to "Projects",
+                    1.00f to "Complete"
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    for ((threshold, label) in stages) {
+                        val done = progress >= threshold
+                        val isCurrent = progress < threshold && progress >= (threshold - 0.16f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .background(
+                                        when {
+                                            done -> BrandPrimary
+                                            isCurrent -> Chart4.copy(alpha = 0.3f)
+                                            else -> BrandMuted
+                                        },
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (done) {
+                                    Text("✓", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                } else if (isCurrent) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 1.5.dp,
+                                        color = Chart4
+                                    )
+                                }
+                            }
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                color = when {
+                                    done -> BrandForeground
+                                    isCurrent -> BrandPrimary
+                                    else -> BrandMutedForeground.copy(alpha = 0.6f)
+                                }
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(modifier = Modifier.fillMaxWidth().height(8.dp).background(BrandMuted, CircleShape)) {
-                        Box(modifier = Modifier.fillMaxWidth(0.6f).height(8.dp).background(BrandPrimary, CircleShape))
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Extracting skills, experience, tech stack...", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = BrandMutedForeground, maxLines = 1)
                 }
             }
         }

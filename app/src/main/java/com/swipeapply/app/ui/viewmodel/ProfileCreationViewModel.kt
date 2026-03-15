@@ -10,7 +10,7 @@ import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.repository.JobRepository
-import com.swipeapply.app.utils.ResumeParser
+import com.swipeapply.app.utils.ResumeParserV2
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +21,9 @@ data class ProfileState(
     val isLoading: Boolean = false,
     val profile: UserProfile? = null,
     val isSaved: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val parseProgress: Float = 0f,
+    val parseStage: String = ""
 )
 
 class ProfileCreationViewModel(
@@ -39,21 +41,29 @@ class ProfileCreationViewModel(
 
     fun parseResume(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, parseProgress = 0f, parseStage = "") }
 
-            val result = ResumeParser.parseResume(context, uri)
+            val result = ResumeParserV2.parseResume(
+                context = context,
+                uri = uri,
+                onProgress = { progress, stage ->
+                    _uiState.update { it.copy(parseProgress = progress, parseStage = stage) }
+                }
+            )
 
             if (result != null) {
-                Log.d("ProfileCreationVM", "Resume parsed successfully")
+                Log.d("ProfileCreationVM", "Resume parsed successfully: ${result.fullName}")
                 _uiState.update {
-                    it.copy(isLoading = false, profile = result)
+                    it.copy(isLoading = false, profile = result, parseProgress = 1f, parseStage = "Done!")
                 }
             } else {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         error = "Could not parse resume. Please fill manually.",
-                        profile = UserProfile()
+                        profile = UserProfile(),
+                        parseProgress = 0f,
+                        parseStage = ""
                     )
                 }
             }

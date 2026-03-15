@@ -144,56 +144,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun buildSearchQueryFromProfile(profile: UserProfile): String? {
         val allKeywords = mutableListOf<String>()
         
-        // Add ALL skills (no limit)
+        // Add ALL skills
         profile.skills.forEach { skill ->
             allKeywords.add(skill.lowercase().trim())
         }
         
-        // Add ALL tech stack (no limit)
+        // Add ALL tech stack
         profile.techStack.forEach { tech ->
             allKeywords.add(tech.lowercase().trim())
         }
         
-        // Extract keywords from ALL experience roles
+        // Add experience role titles as keywords
         profile.experience.forEach { exp ->
-            val title = exp.role.lowercase()
-            // Add the role itself as keyword
-            title.split(" ").forEach { word ->
-                if (word.length > 2) allKeywords.add(word)
-            }
-            // Add related keywords based on role type
-            when {
-                title.contains("hr") || title.contains("recruit") || title.contains("talent") -> {
-                    allKeywords.addAll(listOf("hr", "recruiter", "talent", "human resources", "hiring"))
-                }
-                title.contains("manager") -> allKeywords.addAll(listOf("manager", "management", "lead"))
-                title.contains("engineer") || title.contains("developer") -> {
-                    allKeywords.addAll(listOf("engineer", "developer", "software", "programming"))
-                }
-                title.contains("design") -> allKeywords.addAll(listOf("designer", "design", "ui", "ux"))
-                title.contains("market") -> allKeywords.addAll(listOf("marketing", "growth", "seo", "content"))
-                title.contains("product") -> allKeywords.addAll(listOf("product", "pm", "roadmap"))
-                title.contains("data") -> allKeywords.addAll(listOf("data", "analytics", "ml", "ai"))
-                title.contains("devops") || title.contains("sre") -> {
-                    allKeywords.addAll(listOf("devops", "sre", "infrastructure", "cloud"))
-                }
-                title.contains("frontend") || title.contains("front-end") -> {
-                    allKeywords.addAll(listOf("frontend", "react", "vue", "angular", "javascript"))
-                }
-                title.contains("backend") || title.contains("back-end") -> {
-                    allKeywords.addAll(listOf("backend", "api", "server", "database"))
-                }
-                title.contains("fullstack") || title.contains("full-stack") -> {
-                    allKeywords.addAll(listOf("fullstack", "full-stack", "frontend", "backend"))
-                }
+            val title = exp.role.trim()
+            if (title.isNotBlank()) {
+                allKeywords.add(title.lowercase())
             }
         }
         
-        // Remove duplicates and empty strings, take top keywords for API compatibility
+        // Remove duplicates and empty strings — use ALL keywords, no limit
         val uniqueKeywords = allKeywords
             .filter { it.isNotBlank() && it.length > 1 }
             .distinct()
-            .take(5)  // Limit to top 5 keywords — FindWork API uses simple keyword matching
         
         if (uniqueKeywords.isEmpty()) {
             Log.d(TAG, "No keywords found in profile, using default search")

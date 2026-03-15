@@ -101,6 +101,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.ConfidenceTier
 import com.swipeapply.app.data.model.Employee
+import com.swipeapply.app.ui.components.ReferralEmailComposerContent
 import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.EmployeeCardStack
 import com.swipeapply.app.ui.theme.AccentGreen
@@ -129,8 +130,10 @@ fun EmployeeFinderScreen(
 
     // Detail bottom sheet
     val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val emailComposerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showSavedSheet by remember { mutableStateOf(false) }
     var selectedEmployee by remember { mutableStateOf<Employee?>(null) }
+    var emailTargetEmployee by remember { mutableStateOf<Employee?>(null) }
 
     // Load employees when screen opens
     LaunchedEffect(companyName) {
@@ -276,6 +279,10 @@ fun EmployeeFinderScreen(
                     },
                     onOpenLinkedIn = { url ->
                         openUrl(context, url)
+                    },
+                    onSendReferralEmail = { employee ->
+                        selectedEmployee = null
+                        emailTargetEmployee = employee
                     }
                 )
             }
@@ -295,7 +302,33 @@ fun EmployeeFinderScreen(
                     onDismiss = { showSavedSheet = false },
                     onCopyEmail = { email -> copyToClipboard(context, email) },
                     onOpenLinkedIn = { url -> openUrl(context, url) },
-                    onSendEmail = { email -> sendEmail(context, email) }
+                    onSendEmail = { employee -> 
+                        showSavedSheet = false
+                        emailTargetEmployee = employee
+                    }
+                )
+            }
+        }
+
+        // Referral Email Composer Bottom Sheet
+        if (emailTargetEmployee != null) {
+            ModalBottomSheet(
+                onDismissRequest = { emailTargetEmployee = null },
+                sheetState = emailComposerSheetState,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                ReferralEmailComposerContent(
+                    employee = emailTargetEmployee!!,
+                    companyName = companyName,
+                    jobTitle = null, // Could be passed from job context if available
+                    onDismiss = { emailTargetEmployee = null },
+                    onEmailSent = { 
+                        emailTargetEmployee = null
+                        // Could show success snackbar here
+                    }
                 )
             }
         }
@@ -949,7 +982,8 @@ private fun EmployeeDetailSheet(
     companyName: String,
     onDismiss: () -> Unit,
     onCopyEmail: (String) -> Unit,
-    onOpenLinkedIn: (String) -> Unit
+    onOpenLinkedIn: (String) -> Unit,
+    onSendReferralEmail: (Employee) -> Unit
 ) {
     val BrandPrimary = Color(0xFF0A66C2)
     val BrandSecondary = Color(0xFFE8F3FF)
@@ -1079,7 +1113,7 @@ private fun EmployeeDetailSheet(
         // Action Buttons
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Surface(
-                onClick = { /* TODO Edit Draft */ },
+                onClick = { onSendReferralEmail(employee) },
                 shape = RoundedCornerShape(16.dp),
                 color = BrandSecondary,
                 border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f)),
@@ -1093,21 +1127,16 @@ private fun EmployeeDetailSheet(
             }
 
             Surface(
-                onClick = {
-                    onCopyEmail(employee.email)
-                    if (!employee.linkedinUrl.isNullOrBlank()) {
-                        onOpenLinkedIn(employee.linkedinUrl!!)
-                    }
-                },
+                onClick = { onSendReferralEmail(employee) },
                 shape = RoundedCornerShape(16.dp),
                 color = BrandPrimary,
                 shadowElevation = 8.dp,
                 modifier = Modifier.weight(2f).height(56.dp)
             ) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.OpenInNew, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Email, null, tint = Color.White, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Send Request", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Send Referral", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -1123,7 +1152,7 @@ private fun SavedContactsSheet(
     onDismiss: () -> Unit,
     onCopyEmail: (String) -> Unit,
     onOpenLinkedIn: (String) -> Unit,
-    onSendEmail: (String) -> Unit
+    onSendEmail: (Employee) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1165,7 +1194,7 @@ private fun SavedContactsSheet(
                     SavedContactItem(
                         employee = employee,
                         onCopyEmail = { onCopyEmail(employee.email) },
-                        onSendEmail = { onSendEmail(employee.email) },
+                        onSendEmail = { onSendEmail(employee) },
                         onOpenLinkedIn = {
                             employee.linkedinUrl?.let { onOpenLinkedIn(it) }
                         }

@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.internal.`$Gson$Types`
 
 /**
  * Room entity for storing job data locally
@@ -32,16 +32,19 @@ data class JobEntity(
  */
 class Converters {
     private val gson = Gson()
-    
+
+    // Constructed without an anonymous class so KSP can safely enumerate declarations
+    private val stringListType = `$Gson$Types`.newParameterizedTypeWithOwner(
+        null, List::class.java, String::class.java
+    )
+
     @TypeConverter
-    fun fromStringList(value: List<String>?): String? {
-        return gson.toJson(value)
-    }
-    
+    fun fromStringList(value: List<String>?): String? = gson.toJson(value)
+
     @TypeConverter
     fun toStringList(value: String?): List<String>? {
         if (value == null) return null
-        val listType = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(value, listType)
+        @Suppress("UNCHECKED_CAST")
+        return gson.fromJson(value, stringListType) as? List<String>
     }
 }
