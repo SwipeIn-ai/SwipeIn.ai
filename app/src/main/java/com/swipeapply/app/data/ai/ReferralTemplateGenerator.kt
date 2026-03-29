@@ -19,19 +19,19 @@ import java.util.concurrent.TimeUnit
 
 /**
  * AI-powered cold referral email generator.
- * 
+ *
  * Generates personalized referral request emails based on:
  * - User's profile (skills, experience, background)
  * - Target employee's details (name, role, company)
  * - Optional job context
- * 
+ *
  * Uses OpenRouter API with a fast, free model for real-time generation.
  */
 object ReferralTemplateGenerator {
 
     private const val TAG = "ReferralTemplateGen"
     private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    private const val MODEL = "google/gemma-3-4b-it:free"
+    private const val MODEL = "stepfun/step-3.5-flash:free"
 
     private val httpClient by lazy {
         OkHttpClient.Builder()
@@ -43,13 +43,6 @@ object ReferralTemplateGenerator {
 
     /**
      * Generate a personalized cold referral email.
-     *
-     * @param employee Target employee at the company
-     * @param companyName The company where the employee works
-     * @param userProfile User's profile for personalization
-     * @param jobTitle Optional specific job they're applying for
-     * @param config Generation configuration options
-     * @return Generated ReferralEmail or null if generation fails
      */
     suspend fun generate(
         employee: Employee,
@@ -60,7 +53,7 @@ object ReferralTemplateGenerator {
     ): ReferralEmail? = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.OPENROUTER_API_KEY
         if (apiKey.isBlank()) {
-            Log.e(TAG, "OpenRouter API key not configured — using fallback template")
+            Log.e(TAG, "OpenRouter API key not configured - using fallback template")
             return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
         }
 
@@ -74,7 +67,7 @@ object ReferralTemplateGenerator {
                     put("content", prompt)
                 })
             })
-            put("temperature", 0.7)
+            put("temperature", 0.35)
             put("max_tokens", 600)
         }
 
@@ -100,7 +93,7 @@ object ReferralTemplateGenerator {
                 .optJSONArray("choices")
                 ?.getJSONObject(0)
                 ?.optJSONObject("message")
-            
+
             val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
                 ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
                 ?: return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
@@ -112,8 +105,6 @@ object ReferralTemplateGenerator {
         }
     }
 
-    // ─── Prompt Builder ───────────────────────────────────────────────────────
-
     private fun buildPrompt(
         employee: Employee,
         companyName: String,
@@ -121,73 +112,113 @@ object ReferralTemplateGenerator {
         jobTitle: String?,
         config: ReferralEmailConfig
     ): String {
-        val hasProfile = profile != null && 
+        val hasProfile = profile != null &&
             (profile.fullName.isNotBlank() || profile.skills.isNotEmpty() || profile.experience.isNotEmpty())
 
         val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
         val employeeRole = employee.jobTitle ?: "employee"
+        val senderFirstName = profile?.fullName?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: "[Your first name]"
+        val targetLength = config.maxBodyLength.coerceIn(90, 180)
+        val minLength = (targetLength - 30).coerceAtLeast(75)
+        val maxLength = (targetLength + 10).coerceAtMost(180)
 
         val candidateSection = if (hasProfile && profile != null) {
             val name = profile.fullName.ifBlank { "the applicant" }
             val skills = (profile.skills + profile.techStack)
-                .distinct().take(6).joinToString(", ").ifBlank { "not specified" }
+                .distinct()
+                .take(8)
+                .joinToString(", ")
+                .ifBlank { "not specified" }
             val latestRole = profile.experience.firstOrNull()
-                ?.let { "${it.role} at ${it.company}" } ?: "not specified"
-            val years = profile.experience.size.let { if (it > 0) "${it}+ years in industry" else "" }
-            
+                ?.let { "${it.role} at ${it.company}" }
+                ?: "not specified"
+            val recentImpact = profile.experience.firstOrNull()?.description
+                ?.replace(Regex("\\s+"), " ")
+                ?.take(180)
+                ?.takeIf { it.isNotBlank() }
+                ?: "not specified"
+            val projectHighlight = profile.projects.firstOrNull()
+                ?.let { project ->
+                    buildString {
+                        append(project.name.ifBlank { "Project not named" })
+                        if (project.techUsed.isNotBlank()) append(" (${project.techUsed})")
+                        if (project.description.isNotBlank()) append(": ${project.description}")
+                    }.take(180)
+                } ?: "not specified"
+            val bio = profile.bio
+                .replace(Regex("\\s+"), " ")
+                .take(160)
+                .ifBlank { "not specified" }
+
             """
-SENDER (CANDIDATE):
+KNOWN FACTS ABOUT THE CANDIDATE:
 - Name: $name
 - Current/Recent Role: $latestRole
 - Key Skills: $skills
-${if (years.isNotBlank()) "- Experience: $years" else ""}
+- Recent Impact: $recentImpact
+- Project Highlight: $projectHighlight
+- Bio / Focus: $bio
             """.trimIndent()
         } else {
-            "SENDER: Anonymous candidate (write in first person, no specific claims)"
+            "KNOWN FACTS ABOUT THE CANDIDATE: Limited profile data. Write in first person and keep claims conservative."
         }
 
         val formalityGuide = when (config.formalityLevel) {
-            FormalityLevel.CASUAL -> "friendly and conversational, like texting a colleague"
+            FormalityLevel.CASUAL -> "friendly and conversational, like messaging a colleague"
             FormalityLevel.PROFESSIONAL -> "professional but warm, like emailing a potential mentor"
             FormalityLevel.FORMAL -> "formal and respectful, like writing to a senior executive"
         }
 
         return """
-You are an expert at writing cold outreach emails that actually get responses. Write a referral request email.
+TASK:
+Write a cold referral request email to a real employee. The email should feel credible, specific, and easy to answer.
 
 STRICT RULES:
-1. Total email body: 80-120 words MAXIMUM. Every word must earn its place.
-2. Subject line: Under 8 words, specific, creates curiosity without being clickbait.
-3. Opening: One sentence acknowledging them specifically (their role/company), then immediately state your intent.
-4. Middle: ONE concrete connection point (skill match, shared background, or genuine interest in their work).
-5. Ask: Clear, low-commitment request — "quick chat", "insights", or "if you're open to referring".
-6. Sign off with just "Best," and then the sender's first name on the next line.
-7. Tone: $formalityGuide
-8. DO NOT use: "I hope this finds you well", "reaching out", "passionate", "excited", "opportunity", "leverage", "synergy", generic flattery.
-9. DO NOT mention you found their email through a tool/database.
-10. Be human. Be brief. Be specific.
+1. Use ONLY details explicitly given below. Do not invent shared background, achievements, metrics, or personal context.
+2. Email body length: $minLength-$maxLength words. Keep it tight and skimmable.
+3. Subject line: 4-8 words, plain English, no hype, no clickbait.
+4. Greeting must start with: "Hi $firstName,"
+5. Opening must acknowledge their role or company and immediately state why the sender is writing.
+6. Body must include exactly ONE concrete candidate detail that is actually supported by the profile.
+7. Ask for one low-friction next step: brief advice, a short chat, or consideration for a referral.
+8. Tone: $formalityGuide
+9. Avoid fluff and banned phrases: "I hope this finds you well", "reaching out", "passionate", "excited", "opportunity", "leverage", "synergy", "pick your brain".
+10. No generic praise. No overfamiliarity. No mention of finding their email through a tool or database.
+11. End with:
+Best,
+$senderFirstName
+12. Use short paragraphs. No bullet points. No emojis. No placeholders other than the provided sign-off name if necessary.
 
 $candidateSection
 
-RECIPIENT:
+KNOWN FACTS ABOUT THE RECIPIENT:
 - Name: ${employee.fullName}
 - Role: $employeeRole
 - Company: $companyName
 ${if (employee.department != null) "- Department: ${employee.department}" else ""}
 ${if (employee.city != null) "- Location: ${employee.getFormattedLocation()}" else ""}
+${if (employee.seniority != null) "- Seniority: ${employee.seniority}" else ""}
 
-${if (jobTitle != null) "TARGET ROLE: $jobTitle at $companyName" else "CONTEXT: Looking for opportunities at $companyName"}
+TARGET CONTEXT:
+${if (jobTitle != null) "- Specific role of interest: $jobTitle at $companyName" else "- General goal: learn about roles at $companyName and ask for the most reasonable next step"}
 
-OUTPUT FORMAT (strictly follow — no markdown, no extra text, no JSON):
+WRITING OBJECTIVE:
+- The email should sound like a thoughtful candidate who did enough homework to be relevant.
+- It should make the recipient feel replying would be easy.
+- The best version is specific, calm, and modestly confident.
+
+OUTPUT FORMAT (follow exactly; no markdown, no explanations, no JSON):
 SUBJECT: <subject line>
 BODY:
 <email body starting with greeting>
 
-Remember: You are writing TO $firstName, not about them. Use "you/your" naturally.
+QUALITY CHECK BEFORE WRITING:
+- If a profile fact is weak or missing, leave it out.
+- Prefer one sharp detail over three vague ones.
+- Make sure the ask is clear in one sentence.
         """.trimIndent()
     }
-
-    // ─── Response Parser ──────────────────────────────────────────────────────
 
     private fun parseResponse(
         raw: String,
@@ -196,10 +227,10 @@ Remember: You are writing TO $firstName, not about them. Use "you/your" naturall
         profile: UserProfile?,
         jobTitle: String?
     ): ReferralEmail {
-        // Strip any <think> or reasoning blocks
         val cleaned = raw
             .replace(Regex("<think>[\\s\\S]*?</think>"), "")
             .replace(Regex("\\[THINKING\\][\\s\\S]*?\\[/THINKING\\]"), "")
+            .replace("```", "")
             .trim()
 
         val subjectRegex = Regex("SUBJECT:\\s*(.+)", RegexOption.IGNORE_CASE)
@@ -207,8 +238,6 @@ Remember: You are writing TO $firstName, not about them. Use "you/your" naturall
 
         val subject = subjectRegex.find(cleaned)?.groupValues?.get(1)?.trim()
         val body = bodyRegex.find(cleaned)?.groupValues?.get(1)?.trim()
-
-        val senderFirstName = profile?.fullName?.split(" ")?.firstOrNull() ?: ""
 
         return ReferralEmail(
             fromName = profile?.fullName ?: "",
@@ -221,8 +250,6 @@ Remember: You are writing TO $firstName, not about them. Use "you/your" naturall
             jobTitle = jobTitle
         )
     }
-
-    // ─── Fallback Templates ───────────────────────────────────────────────────
 
     private fun buildFallbackEmail(
         employee: Employee,
@@ -259,7 +286,7 @@ Remember: You are writing TO $firstName, not about them. Use "you/your" naturall
         val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
         val senderName = profile?.fullName?.split(" ")?.firstOrNull() ?: ""
         val role = jobTitle ?: "roles"
-        
+
         val skillMention = if (profile != null && profile.skills.isNotEmpty()) {
             val topSkills = profile.skills.take(2).joinToString(" and ")
             "My background is in $topSkills, and"
@@ -274,7 +301,7 @@ I noticed your work at $companyName and wanted to reach out directly. $skillMent
 
 Would you be open to a brief chat about your experience there, or if you're comfortable, considering a referral?
 
-Totally understand if you're busy — either way, thanks for your time.
+Totally understand if you're busy - either way, thanks for your time.
 
 Best,
 $senderName

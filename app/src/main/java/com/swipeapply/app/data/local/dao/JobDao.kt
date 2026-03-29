@@ -48,6 +48,13 @@ interface JobDao {
     @Query("SELECT * FROM swiped_jobs WHERE userId = :userId ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentSwipedJobsByUser(userId: String, limit: Int): List<SwipedJobEntity>
 
+    @Query("SELECT * FROM swiped_jobs WHERE userId = :userId AND direction = :direction ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentSwipedJobsByUserAndDirection(
+        userId: String,
+        direction: String,
+        limit: Int
+    ): List<SwipedJobEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSwipedJob(swipedJob: SwipedJobEntity)
 

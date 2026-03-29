@@ -8,6 +8,7 @@ import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.manager.StreakManager
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.data.model.ApplicationStatus
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.data.model.SwipeResult
 import com.swipeapply.app.data.model.UserProfile
@@ -36,7 +37,8 @@ data class UndoableAction(
 data class SwipeHistoryEntry(
     val card: JobCard,
     val direction: SwipeDirection,
-    val timestamp: Long
+    val timestamp: Long,
+    val applicationStatus: ApplicationStatus? = null
 ) {
     val isInterested: Boolean
         get() = direction == SwipeDirection.RIGHT
@@ -276,7 +278,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 SwipeHistoryEntry(
                     card = it.card,
                     direction = it.direction,
-                    timestamp = it.timestamp
+                    timestamp = it.timestamp,
+                    applicationStatus = it.applicationStatus
                 )
             }
             _uiState.update { it.copy(swipeHistory = history) }
@@ -386,7 +389,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val historyEntry = SwipeHistoryEntry(
                     card = card,
                     direction = direction,
-                    timestamp = undoableAction.timestamp
+                    timestamp = undoableAction.timestamp,
+                    applicationStatus = if (direction == SwipeDirection.RIGHT) ApplicationStatus.SAVED else null
                 )
 
                 state.copy(

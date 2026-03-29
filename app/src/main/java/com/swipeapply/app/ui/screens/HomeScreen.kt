@@ -88,6 +88,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,6 +113,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.data.model.LocationType
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
@@ -181,6 +183,16 @@ fun HomeScreen(
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showActivitySheet by remember { mutableStateOf(false) }
     var showLogoutConfirmation by remember { mutableStateOf(false) }
+    var activeFilter by rememberSaveable { mutableStateOf(HomeQuickFilter.ALL) }
+    val filteredCards = remember(uiState.cards, activeFilter) {
+        when (activeFilter) {
+            HomeQuickFilter.ALL -> uiState.cards
+            HomeQuickFilter.REMOTE -> uiState.cards.filter { it.locationType == LocationType.REMOTE }
+            HomeQuickFilter.HYBRID -> uiState.cards.filter { it.locationType == LocationType.HYBRID }
+            HomeQuickFilter.ONSITE -> uiState.cards.filter { it.locationType == LocationType.ONSITE }
+            HomeQuickFilter.TECH_STACK -> uiState.cards.filter { it.techStack.isNotEmpty() }
+        }
+    }
 
     LaunchedEffect(uiState.showBottomSheet) {
         if (uiState.showBottomSheet) detailSheetState.show() else detailSheetState.hide()
@@ -201,6 +213,12 @@ fun HomeScreen(
                 onSettingsClick = { showSettingsSheet = true }
             )
 
+            HomeQuickFilters(
+                activeFilter = activeFilter,
+                cards = uiState.cards,
+                onFilterSelected = { activeFilter = it }
+            )
+
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 when {
                     uiState.isLoading -> ShimmerCardStack()
@@ -218,18 +236,24 @@ fun HomeScreen(
                             Text(text = "Loading more jobs...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    uiState.cards.isNotEmpty() && filteredCards.isEmpty() -> {
+                        FilterEmptyState(
+                            activeFilter = activeFilter,
+                            onReset = { activeFilter = HomeQuickFilter.ALL }
+                        )
+                    }
                     uiState.cards.isNotEmpty() -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (uiState.totalJobs > 0) {
                                 Text(
-                                    text = "${uiState.cards.size} of ${uiState.totalJobs} jobs remaining",
+                                    text = "${filteredCards.size} visible • ${uiState.cards.size} total remaining",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
                             SwipeCardStack(
-                                cards = uiState.cards,
+                                cards = filteredCards,
                                 onCardSwiped = { card, direction ->
                                     viewModel.onCardSwiped(card, direction)
                                     if (direction == SwipeDirection.RIGHT) {
@@ -258,12 +282,12 @@ fun HomeScreen(
                     ActionButtons(
                         onSkip = {
                             view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                            uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
+                            filteredCards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
                         },
                         onActivity = { showActivitySheet = true },
                         onInterested = {
                             view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            uiState.cards.firstOrNull()?.let { card ->
+                            filteredCards.firstOrNull()?.let { card ->
                                 viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
                                 lastRightSwipedCompany = card.company.name
                             }
@@ -401,6 +425,66 @@ fun HomeScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
         )
+    }
+}
+
+@Composable
+private fun HomeQuickFilters(
+    activeFilter: HomeQuickFilter,
+    cards: List<JobCard>,
+    onFilterSelected: (HomeQuickFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        HomeQuickFilter.entries.forEach { filter ->
+            val count = when (filter) {
+                HomeQuickFilter.ALL -> cards.size
+                HomeQuickFilter.REMOTE -> cards.count { it.locationType == LocationType.REMOTE }
+                HomeQuickFilter.HYBRID -> cards.count { it.locationType == LocationType.HYBRID }
+                HomeQuickFilter.ONSITE -> cards.count { it.locationType == LocationType.ONSITE }
+                HomeQuickFilter.TECH_STACK -> cards.count { it.techStack.isNotEmpty() }
+            }
+            FilterChip(
+                selected = activeFilter == filter,
+                onClick = { onFilterSelected(filter) },
+                label = { Text("${filter.label} ($count)") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterEmptyState(
+    activeFilter: HomeQuickFilter,
+    onReset: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Text(
+            text = "No jobs match ${activeFilter.label.lowercase()} right now.",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "Try another quick filter or jump back to the full queue.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        OutlinedButton(onClick = onReset) {
+            Text("Show all jobs")
+        }
     }
 }
 
@@ -810,6 +894,14 @@ private enum class ActivityFilter {
     DISLIKED
 }
 
+private enum class HomeQuickFilter(val label: String) {
+    ALL("All"),
+    REMOTE("Remote"),
+    HYBRID("Hybrid"),
+    ONSITE("On-site"),
+    TECH_STACK("Tech stack")
+}
+
 @Composable
 private fun SwipeActivitySheet(
     history: List<SwipeHistoryEntry>,
@@ -985,6 +1077,15 @@ private fun SwipeActivityItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            item.applicationStatus?.let { status ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Status: ${status.label}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
             if (item.card.techStack.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
