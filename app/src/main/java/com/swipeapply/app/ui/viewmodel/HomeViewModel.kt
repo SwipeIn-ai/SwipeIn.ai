@@ -33,10 +33,20 @@ data class UndoableAction(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+data class SwipeHistoryEntry(
+    val card: JobCard,
+    val direction: SwipeDirection,
+    val timestamp: Long
+) {
+    val isInterested: Boolean
+        get() = direction == SwipeDirection.RIGHT
+}
+
 data class HomeUiState(
     val cards: List<JobCard> = emptyList(),
     val interestedCards: List<JobCard> = emptyList(),
     val skippedCards: List<JobCard> = emptyList(),
+    val swipeHistory: List<SwipeHistoryEntry> = emptyList(),
     val selectedCard: JobCard? = null,
     val showBottomSheet: Boolean = false,
     val isLoading: Boolean = false,
@@ -81,6 +91,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         JobRankingService.initialize(application.applicationContext)
         initializeCurrentUser()
+        loadSwipeHistory()
         // First fetch profile, then load cards with profile-based search
         fetchUserProfileThenLoadCards()
     }
@@ -259,6 +270,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadSwipeHistory() {
+        viewModelScope.launch {
+            val history = repository.getSwipeHistory().map {
+                SwipeHistoryEntry(
+                    card = it.card,
+                    direction = it.direction,
+                    timestamp = it.timestamp
+                )
+            }
+            _uiState.update { it.copy(swipeHistory = history) }
+        }
+    }
+
     private suspend fun applyRankingIfEnabled(jobs: List<JobCard>): List<JobCard> {
         val state = _uiState.value
         
@@ -359,12 +383,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 val result = SwipeResult(card.id, direction, direction == SwipeDirection.RIGHT)
                 val undoableAction = UndoableAction(card, result)
+                val historyEntry = SwipeHistoryEntry(
+                    card = card,
+                    direction = direction,
+                    timestamp = undoableAction.timestamp
+                )
 
                 state.copy(
                     cards = currentList,
                     isEmpty = currentList.isEmpty() && nextJob == null,
                     interestedCards = if (direction == SwipeDirection.RIGHT) state.interestedCards + card else state.interestedCards,
                     skippedCards = if (direction == SwipeDirection.LEFT) state.skippedCards + card else state.skippedCards,
+                    swipeHistory = listOf(historyEntry) + state.swipeHistory.filterNot { it.card.id == card.id },
                     undoHistory = state.undoHistory + undoableAction,
                     canUndo = true,
                     currentStreak = newStreak,
@@ -389,12 +419,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             val lastAction = undoHistory.last()
             val card = lastAction.card
+            repository.removeSwipe(card.id)
 
             _uiState.update { state ->
                 state.copy(
                     cards = listOf(card) + state.cards,
                     interestedCards = state.interestedCards.filter { it.id != card.id },
                     skippedCards = state.skippedCards.filter { it.id != card.id },
+                    swipeHistory = state.swipeHistory.filter { it.card.id != card.id },
                     isEmpty = false,
                     undoHistory = undoHistory.dropLast(1),
                     canUndo = undoHistory.size > 1
@@ -411,6 +443,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             val actionsToUndo = undoHistory.takeLast(actualCount)
             val cardsToRestore = actionsToUndo.map { it.card }.reversed()
+            actionsToUndo.forEach { repository.removeSwipe(it.card.id) }
 
             _uiState.update { state ->
                 val newInterestedCards = state.interestedCards.filter { card ->
@@ -424,6 +457,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     cards = cardsToRestore + state.cards,
                     interestedCards = newInterestedCards,
                     skippedCards = newSkippedCards,
+                    swipeHistory = state.swipeHistory.filter { historyItem ->
+                        actionsToUndo.none { it.card.id == historyItem.card.id }
+                    },
                     isEmpty = false,
                     undoHistory = undoHistory.dropLast(actualCount),
                     canUndo = undoHistory.size > actualCount
@@ -439,17 +475,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun getUndoCount(): Int = _uiState.value.undoHistory.size
 
     fun resetCards() {
-        _uiState.update {
-            it.copy(interestedCards = emptyList(), skippedCards = emptyList(), undoHistory = emptyList(), canUndo = false)
+        viewModelScope.launch {
+            repository.clearSwipeHistory()
+            _uiState.update {
+                it.copy(
+                    interestedCards = emptyList(),
+                    skippedCards = emptyList(),
+                    swipeHistory = emptyList(),
+                    undoHistory = emptyList(),
+                    canUndo = false
+                )
+            }
+            loadCardsWithCurrentSearch()
         }
-        loadCardsWithCurrentSearch()
     }
 
     fun getStats(): SwipeStats {
         val state = _uiState.value
         return SwipeStats(
-            interested = state.interestedCards.size,
-            skipped = state.skippedCards.size,
+            interested = state.swipeHistory.count { it.direction == SwipeDirection.RIGHT },
+            skipped = state.swipeHistory.count { it.direction == SwipeDirection.LEFT },
             remaining = state.cards.size,
             undoCount = state.undoHistory.size
         )
@@ -466,6 +511,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun debugClearHistory() {
         viewModelScope.launch {
             repository.clearSwipeHistory()
+            _uiState.update {
+                it.copy(
+                    interestedCards = emptyList(),
+                    skippedCards = emptyList(),
+                    swipeHistory = emptyList(),
+                    undoHistory = emptyList(),
+                    canUndo = false
+                )
+            }
             refreshCards()
         }
     }

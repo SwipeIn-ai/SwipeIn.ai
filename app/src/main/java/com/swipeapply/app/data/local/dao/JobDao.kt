@@ -45,8 +45,14 @@ interface JobDao {
     @Query("SELECT DISTINCT jobId FROM swiped_jobs")
     suspend fun getAllSwipedJobIds(): List<String>
 
+    @Query("SELECT * FROM swiped_jobs WHERE userId = :userId ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentSwipedJobsByUser(userId: String, limit: Int): List<SwipedJobEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSwipedJob(swipedJob: SwipedJobEntity)
+
+    @Query("DELETE FROM swiped_jobs WHERE jobId = :jobId AND userId = :userId")
+    suspend fun deleteSwipedJobByUser(jobId: String, userId: String)
 
     /** Clear swipe history for a specific user only */
     @Query("DELETE FROM swiped_jobs WHERE userId = :userId")

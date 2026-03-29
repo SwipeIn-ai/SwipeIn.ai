@@ -11,6 +11,7 @@ import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.EducationItem
 import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.ProjectItem
+import com.swipeapply.app.data.model.SwipeDirection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -40,6 +41,12 @@ data class SupabaseProfileData(
     val education: List<EducationItem>,
     val experience: List<ExperienceItem>,
     val projects: List<ProjectItem>
+)
+
+data class SwipedJobHistoryItem(
+    val card: JobCard,
+    val direction: SwipeDirection,
+    val timestamp: Long
 )
 
 class JobRepository(private val context: Context, private val apiKey: String) {
@@ -267,6 +274,29 @@ class JobRepository(private val context: Context, private val apiKey: String) {
             jobDao.insertSwipedJob(SwipedJobEntity(jobId = jobId, userId = currentUserId, direction = direction)) 
         } 
         catch (e: Exception) { Log.e(TAG, "DB Error: ${e.message}") }
+    }
+
+    suspend fun removeSwipe(jobId: String) = withContext(Dispatchers.IO) {
+        try {
+            jobDao.deleteSwipedJobByUser(jobId, currentUserId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to remove swipe for job $jobId: ${e.message}", e)
+        }
+    }
+
+    suspend fun getSwipeHistory(limit: Int = 50): List<SwipedJobHistoryItem> = withContext(Dispatchers.IO) {
+        jobDao.getRecentSwipedJobsByUser(currentUserId, limit).mapNotNull { swipedJob ->
+            val job = jobDao.getJobById(swipedJob.jobId) ?: return@mapNotNull null
+            val direction = runCatching { SwipeDirection.valueOf(swipedJob.direction) }
+                .getOrDefault(SwipeDirection.NONE)
+            if (direction == SwipeDirection.NONE) return@mapNotNull null
+
+            SwipedJobHistoryItem(
+                card = job.toJobCard(),
+                direction = direction,
+                timestamp = swipedJob.timestamp
+            )
+        }
     }
 
     suspend fun clearCache() = withContext(Dispatchers.IO) {
