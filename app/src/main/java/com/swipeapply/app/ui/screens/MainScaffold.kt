@@ -71,10 +71,11 @@ sealed class MainTab(
     val unselectedIcon: ImageVector
 ) {
     object Jobs : MainTab(0, "Jobs", Icons.Filled.Work, Icons.Outlined.WorkOutline)
-    object Contacts : MainTab(1, "Contacts", Icons.Filled.People, Icons.Outlined.People)
+    object Saved : MainTab(1, "Saved", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder)
+    object Contacts : MainTab(2, "Contacts", Icons.Filled.People, Icons.Outlined.People)
 
     companion object {
-        val all = listOf(Jobs, Contacts)
+        val all = listOf(Jobs, Saved, Contacts)
     }
 }
 
@@ -135,7 +136,12 @@ fun MainScaffold(
                             onSignOutSuccess = onSignOutSuccess,
                             modifier = Modifier.fillMaxSize()
                         )
-                        1 -> ContactsScreen(modifier = Modifier.fillMaxSize())
+                        1 -> SavedJobsScreen(
+                            onRequestIntro = onRequestIntro,
+                            onNavigateToEmployeeFinder = onNavigateToEmployeeFinder,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        2 -> ContactsScreen(modifier = Modifier.fillMaxSize())
                     }
                 }
             }

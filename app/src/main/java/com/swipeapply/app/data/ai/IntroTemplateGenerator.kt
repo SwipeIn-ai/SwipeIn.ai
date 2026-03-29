@@ -26,7 +26,7 @@ object IntroTemplateGenerator {
 
     private const val TAG = "IntroTemplateGenerator"
     private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    private const val MODEL = "google/gemma-3-4b-it:free"
+    private const val MODEL = "stepfun/step-3.5-flash:free"
 
     private val httpClient by lazy {
         OkHttpClient.Builder()

@@ -1,6 +1,7 @@
 package com.swipeapply.app.ui.screens
 
 import android.app.Application
+import android.text.format.DateUtils
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -21,6 +22,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +62,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -85,6 +88,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,6 +113,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.data.model.LocationType
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
@@ -119,6 +124,7 @@ import com.swipeapply.app.ui.theme.AccentRedLight
 import com.swipeapply.app.ui.theme.GradientEnd
 import com.swipeapply.app.ui.theme.GradientStart
 import com.swipeapply.app.ui.viewmodel.HomeViewModel
+import com.swipeapply.app.ui.viewmodel.SwipeHistoryEntry
 import com.swipeapply.app.ui.viewmodel.UndoableAction
 import com.swipeapply.app.ui.viewmodel.ViewModelFactory
 import io.github.jan.supabase.auth.SignOutScope
@@ -172,9 +178,21 @@ fun HomeScreen(
 
     val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val activitySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var showUndoDialog by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var showActivitySheet by remember { mutableStateOf(false) }
     var showLogoutConfirmation by remember { mutableStateOf(false) }
+    var activeFilter by rememberSaveable { mutableStateOf(HomeQuickFilter.ALL) }
+    val filteredCards = remember(uiState.cards, activeFilter) {
+        when (activeFilter) {
+            HomeQuickFilter.ALL -> uiState.cards
+            HomeQuickFilter.REMOTE -> uiState.cards.filter { it.locationType == LocationType.REMOTE }
+            HomeQuickFilter.HYBRID -> uiState.cards.filter { it.locationType == LocationType.HYBRID }
+            HomeQuickFilter.ONSITE -> uiState.cards.filter { it.locationType == LocationType.ONSITE }
+            HomeQuickFilter.TECH_STACK -> uiState.cards.filter { it.techStack.isNotEmpty() }
+        }
+    }
 
     LaunchedEffect(uiState.showBottomSheet) {
         if (uiState.showBottomSheet) detailSheetState.show() else detailSheetState.hide()
@@ -190,7 +208,15 @@ fun HomeScreen(
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.undoLastSwipe()
                 },
+                onActivityClick = { showActivitySheet = true },
+                swipeHistoryCount = uiState.swipeHistory.size,
                 onSettingsClick = { showSettingsSheet = true }
+            )
+
+            HomeQuickFilters(
+                activeFilter = activeFilter,
+                cards = uiState.cards,
+                onFilterSelected = { activeFilter = it }
             )
 
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -198,7 +224,10 @@ fun HomeScreen(
                     uiState.isLoading -> ShimmerCardStack()
                     uiState.error != null -> ErrorState(error = uiState.error!!, onRetry = { viewModel.refreshCards() })
                     uiState.isEmpty && !uiState.hasMorePages && !uiState.isLoadingMore -> {
-                        EmptyState(interestedCount = uiState.interestedCards.size, onReset = { viewModel.resetCards() })
+                        EmptyState(
+                            interestedCount = uiState.swipeHistory.count { it.isInterested },
+                            onReset = { viewModel.resetCards() }
+                        )
                     }
                     uiState.cards.isEmpty() && (uiState.hasMorePages || uiState.isLoadingMore) -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -207,18 +236,24 @@ fun HomeScreen(
                             Text(text = "Loading more jobs...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    uiState.cards.isNotEmpty() && filteredCards.isEmpty() -> {
+                        FilterEmptyState(
+                            activeFilter = activeFilter,
+                            onReset = { activeFilter = HomeQuickFilter.ALL }
+                        )
+                    }
                     uiState.cards.isNotEmpty() -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (uiState.totalJobs > 0) {
                                 Text(
-                                    text = "${uiState.cards.size} of ${uiState.totalJobs} jobs remaining",
+                                    text = "${filteredCards.size} visible • ${uiState.cards.size} total remaining",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
                             SwipeCardStack(
-                                cards = uiState.cards,
+                                cards = filteredCards,
                                 onCardSwiped = { card, direction ->
                                     viewModel.onCardSwiped(card, direction)
                                     if (direction == SwipeDirection.RIGHT) {
@@ -247,11 +282,12 @@ fun HomeScreen(
                     ActionButtons(
                         onSkip = {
                             view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                            uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
+                            filteredCards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
                         },
+                        onActivity = { showActivitySheet = true },
                         onInterested = {
                             view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            uiState.cards.firstOrNull()?.let { card ->
+                            filteredCards.firstOrNull()?.let { card ->
                                 viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
                                 lastRightSwipedCompany = card.company.name
                             }
@@ -320,6 +356,25 @@ fun HomeScreen(
             }
         }
 
+        if (showActivitySheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showActivitySheet = false },
+                sheetState = activitySheetState,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                containerColor = MaterialTheme.colorScheme.surface,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                SwipeActivitySheet(
+                    history = uiState.swipeHistory,
+                    onDismiss = { showActivitySheet = false },
+                    onJobSelected = { card ->
+                        showActivitySheet = false
+                        viewModel.selectCard(card)
+                    }
+                )
+            }
+        }
+
         if (showLogoutConfirmation) {
             AlertDialog(
                 onDismissRequest = { showLogoutConfirmation = false },
@@ -374,11 +429,73 @@ fun HomeScreen(
 }
 
 @Composable
+private fun HomeQuickFilters(
+    activeFilter: HomeQuickFilter,
+    cards: List<JobCard>,
+    onFilterSelected: (HomeQuickFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        HomeQuickFilter.entries.forEach { filter ->
+            val count = when (filter) {
+                HomeQuickFilter.ALL -> cards.size
+                HomeQuickFilter.REMOTE -> cards.count { it.locationType == LocationType.REMOTE }
+                HomeQuickFilter.HYBRID -> cards.count { it.locationType == LocationType.HYBRID }
+                HomeQuickFilter.ONSITE -> cards.count { it.locationType == LocationType.ONSITE }
+                HomeQuickFilter.TECH_STACK -> cards.count { it.techStack.isNotEmpty() }
+            }
+            FilterChip(
+                selected = activeFilter == filter,
+                onClick = { onFilterSelected(filter) },
+                label = { Text("${filter.label} ($count)") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterEmptyState(
+    activeFilter: HomeQuickFilter,
+    onReset: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Text(
+            text = "No jobs match ${activeFilter.label.lowercase()} right now.",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "Try another quick filter or jump back to the full queue.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        OutlinedButton(onClick = onReset) {
+            Text("Show all jobs")
+        }
+    }
+}
+
+@Composable
 private fun HomeTopBar(
     stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
     currentStreak: Int,
     todaySwipeCount: Int,
     onUndo: () -> Unit,
+    onActivityClick: () -> Unit,
+    swipeHistoryCount: Int,
     onSettingsClick: () -> Unit
 ) {
     val dailyGoal = com.swipeapply.app.data.manager.StreakManager.DAILY_GOAL
@@ -454,6 +571,35 @@ private fun HomeTopBar(
                         exit = scaleOut() + fadeOut()
                     ) {
                         StatBadge(count = stats.interested, color = AccentGreen)
+                    }
+
+                    IconButton(onClick = onActivityClick) {
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Icon(
+                                imageVector = Icons.Default.Bookmark,
+                                contentDescription = "Swipe activity",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = swipeHistoryCount > 0,
+                                enter = scaleIn() + fadeIn(),
+                                exit = scaleOut() + fadeOut()
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = GradientStart,
+                                    modifier = Modifier.offset(x = 6.dp, y = (-4).dp)
+                                ) {
+                                    Text(
+                                        text = swipeHistoryCount.coerceAtMost(99).toString(),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     IconButton(onClick = onSettingsClick) {
@@ -730,15 +876,234 @@ private fun EmptyState(interestedCount: Int, onReset: () -> Unit) {
 }
 
 @Composable
-private fun ActionButtons(onSkip: () -> Unit, onInterested: () -> Unit) {
+private fun ActionButtons(onSkip: () -> Unit, onActivity: () -> Unit, onInterested: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).padding(bottom = 24.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         ActionButton(icon = Icons.Default.Close, contentDescription = "Skip", containerColor = Color.White, contentColor = Color(0xFF657786), onClick = onSkip, modifier = Modifier.offset(y = (-16).dp))
-        ActionButton(icon = Icons.Default.Bookmark, contentDescription = "Saved", containerColor = Color.White, contentColor = Color(0xFF2196F3), onClick = {}, isSmall = true, modifier = Modifier.offset(y = 8.dp))
+        ActionButton(icon = Icons.Default.Bookmark, contentDescription = "Activity", containerColor = Color.White, contentColor = Color(0xFF2196F3), onClick = onActivity, isSmall = true, modifier = Modifier.offset(y = 8.dp))
         ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = Color.White, contentColor = Color(0xFFFF5252), onClick = onInterested, modifier = Modifier.offset(y = (-16).dp))
+    }
+}
+
+private enum class ActivityFilter {
+    ALL,
+    LIKED,
+    DISLIKED
+}
+
+private enum class HomeQuickFilter(val label: String) {
+    ALL("All"),
+    REMOTE("Remote"),
+    HYBRID("Hybrid"),
+    ONSITE("On-site"),
+    TECH_STACK("Tech stack")
+}
+
+@Composable
+private fun SwipeActivitySheet(
+    history: List<SwipeHistoryEntry>,
+    onDismiss: () -> Unit,
+    onJobSelected: (JobCard) -> Unit
+) {
+    var filter by remember { mutableStateOf(ActivityFilter.ALL) }
+    val likedCount = history.count { it.isInterested }
+    val skippedCount = history.count { it.direction == SwipeDirection.LEFT }
+    val filteredHistory = remember(history, filter) {
+        when (filter) {
+            ActivityFilter.ALL -> history
+            ActivityFilter.LIKED -> history.filter { it.isInterested }
+            ActivityFilter.DISLIKED -> history.filter { it.direction == SwipeDirection.LEFT }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp)
+            .navigationBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Swipe Activity",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$likedCount liked • $skippedCount skipped",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            FilterChip(
+                selected = filter == ActivityFilter.ALL,
+                onClick = { filter = ActivityFilter.ALL },
+                label = { Text("All (${history.size})") }
+            )
+            FilterChip(
+                selected = filter == ActivityFilter.LIKED,
+                onClick = { filter = ActivityFilter.LIKED },
+                label = { Text("Liked ($likedCount)") }
+            )
+            FilterChip(
+                selected = filter == ActivityFilter.DISLIKED,
+                onClick = { filter = ActivityFilter.DISLIKED },
+                label = { Text("Skipped ($skippedCount)") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (filteredHistory.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (history.isEmpty()) "Start swiping to build your activity feed." else "No jobs match this filter yet.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(filteredHistory, key = { "${it.card.id}-${it.timestamp}" }) { item ->
+                    SwipeActivityItem(item = item, onClick = { onJobSelected(item.card) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwipeActivityItem(
+    item: SwipeHistoryEntry,
+    onClick: () -> Unit
+) {
+    val accentColor = if (item.isInterested) AccentGreen else AccentRed
+    val accentBackground = if (item.isInterested) AccentGreenLight else AccentRedLight
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.card.company.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = item.card.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = accentBackground.copy(alpha = 0.35f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (item.isInterested) Icons.Default.Favorite else Icons.Default.Close,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = if (item.isInterested) "Liked" else "Skipped",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accentColor
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = item.card.location,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            item.applicationStatus?.let { status ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Status: ${status.label}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (item.card.techStack.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = item.card.techStack.joinToString(" • "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = DateUtils.getRelativeTimeSpanString(item.timestamp).toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

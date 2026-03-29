@@ -5,12 +5,15 @@ import android.util.Log
 import com.swipeapply.app.data.api.FindWorkApiService
 import com.swipeapply.app.data.local.SwipeApplyDatabase
 import com.swipeapply.app.data.local.entity.SwipedJobEntity
+import com.swipeapply.app.data.manager.SavedJobStatusManager
 import com.swipeapply.app.data.mapper.toEntity
 import com.swipeapply.app.data.mapper.toJobCard
+import com.swipeapply.app.data.model.ApplicationStatus
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.EducationItem
 import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.ProjectItem
+import com.swipeapply.app.data.model.SwipeDirection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -42,9 +45,17 @@ data class SupabaseProfileData(
     val projects: List<ProjectItem>
 )
 
+data class SwipedJobHistoryItem(
+    val card: JobCard,
+    val direction: SwipeDirection,
+    val timestamp: Long,
+    val applicationStatus: ApplicationStatus? = null
+)
+
 class JobRepository(private val context: Context, private val apiKey: String) {
 
     private val jobDao = SwipeApplyDatabase.getDatabase(context).jobDao()
+    private val savedJobStatusManager = SavedJobStatusManager.getInstance(context)
     
     // Current user ID for user-specific swipe tracking
     // Defaults to "local_user" for dev mode (skip login)
@@ -269,6 +280,52 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         catch (e: Exception) { Log.e(TAG, "DB Error: ${e.message}") }
     }
 
+    suspend fun removeSwipe(jobId: String) = withContext(Dispatchers.IO) {
+        try {
+            jobDao.deleteSwipedJobByUser(jobId, currentUserId)
+            savedJobStatusManager.clearStatus(currentUserId, jobId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to remove swipe for job $jobId: ${e.message}", e)
+        }
+    }
+
+    suspend fun getSwipeHistory(limit: Int = 50): List<SwipedJobHistoryItem> = withContext(Dispatchers.IO) {
+        jobDao.getRecentSwipedJobsByUser(currentUserId, limit).mapNotNull { swipedJob ->
+            val job = jobDao.getJobById(swipedJob.jobId) ?: return@mapNotNull null
+            val direction = runCatching { SwipeDirection.valueOf(swipedJob.direction) }
+                .getOrDefault(SwipeDirection.NONE)
+            if (direction == SwipeDirection.NONE) return@mapNotNull null
+            val applicationStatus = if (direction == SwipeDirection.RIGHT) {
+                savedJobStatusManager.getStatus(currentUserId, swipedJob.jobId) ?: ApplicationStatus.SAVED
+            } else {
+                null
+            }
+
+            SwipedJobHistoryItem(
+                card = job.toJobCard(),
+                direction = direction,
+                timestamp = swipedJob.timestamp,
+                applicationStatus = applicationStatus
+            )
+        }
+    }
+
+    suspend fun getLikedJobs(limit: Int = 200): List<SwipedJobHistoryItem> = withContext(Dispatchers.IO) {
+        jobDao.getRecentSwipedJobsByUserAndDirection(currentUserId, SwipeDirection.RIGHT.name, limit).mapNotNull { swipedJob ->
+            val job = jobDao.getJobById(swipedJob.jobId) ?: return@mapNotNull null
+            SwipedJobHistoryItem(
+                card = job.toJobCard(),
+                direction = SwipeDirection.RIGHT,
+                timestamp = swipedJob.timestamp,
+                applicationStatus = savedJobStatusManager.getStatus(currentUserId, swipedJob.jobId) ?: ApplicationStatus.SAVED
+            )
+        }
+    }
+
+    suspend fun updateApplicationStatus(jobId: String, status: ApplicationStatus) = withContext(Dispatchers.IO) {
+        savedJobStatusManager.setStatus(currentUserId, jobId, status)
+    }
+
     suspend fun clearCache() = withContext(Dispatchers.IO) {
         jobQueue.clear()
         queuedJobIds.clear()
@@ -280,6 +337,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     suspend fun clearSwipeHistory() = withContext(Dispatchers.IO) {
         // Clear only for current user (user-specific)
         jobDao.deleteSwipedJobsByUser(currentUserId)
+        savedJobStatusManager.clearAllForUser(currentUserId)
         clearCache()
         Log.d(TAG, "Cleared swipe history for user: $currentUserId")
     }
@@ -291,6 +349,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     suspend fun clearAllLocalData() = withContext(Dispatchers.IO) {
         Log.d(TAG, "Clearing all local data for user: $currentUserId")
         jobDao.deleteSwipedJobsByUser(currentUserId)
+        savedJobStatusManager.clearAllForUser(currentUserId)
         clearCache()
         currentUserId = "local_user" // Reset to default
     }
