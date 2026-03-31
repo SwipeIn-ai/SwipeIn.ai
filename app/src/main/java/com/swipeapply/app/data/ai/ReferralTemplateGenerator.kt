@@ -25,13 +25,13 @@ import java.util.concurrent.TimeUnit
  * - Target employee's details (name, role, company)
  * - Optional job context
  *
- * Uses OpenRouter API with a fast, free model for real-time generation.
+ * Uses Groq API with Llama 3.1 8B Instant for real-time generation.
  */
 object ReferralTemplateGenerator {
 
     private const val TAG = "ReferralTemplateGen"
-    private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    private const val MODEL = "stepfun/step-3.5-flash:free"
+    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+    private const val MODEL = "llama-3.1-8b-instant"
 
     private val httpClient by lazy {
         OkHttpClient.Builder()
@@ -41,9 +41,6 @@ object ReferralTemplateGenerator {
             .build()
     }
 
-    /**
-     * Generate a personalized cold referral email.
-     */
     suspend fun generate(
         employee: Employee,
         companyName: String,
@@ -51,9 +48,9 @@ object ReferralTemplateGenerator {
         jobTitle: String? = null,
         config: ReferralEmailConfig = ReferralEmailConfig()
     ): ReferralEmail? = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.OPENROUTER_API_KEY
+        val apiKey = BuildConfig.GROQ_API_KEY
         if (apiKey.isBlank()) {
-            Log.e(TAG, "OpenRouter API key not configured - using fallback template")
+            Log.e(TAG, "Groq API key not configured - using fallback template")
             return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
         }
 
@@ -72,24 +69,22 @@ object ReferralTemplateGenerator {
         }
 
         val request = Request.Builder()
-            .url(OPENROUTER_URL)
+            .url(GROQ_URL)
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
-            .addHeader("HTTP-Referer", "https://swipeapply.app")
-            .addHeader("X-Title", "SwipeApply Referral Generator")
             .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         return@withContext try {
             val response = httpClient.newCall(request).execute()
-            val body = response.body?.string()
+            val body = response.body.string()
 
             if (!response.isSuccessful) {
-                Log.e(TAG, "OpenRouter error ${response.code}: $body")
+                Log.e(TAG, "Groq error ${response.code}: $body")
                 return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
             }
 
-            val message = JSONObject(body ?: "")
+            val message = JSONObject(body)
                 .optJSONArray("choices")
                 ?.getJSONObject(0)
                 ?.optJSONObject("message")
@@ -123,7 +118,7 @@ object ReferralTemplateGenerator {
         val minLength = (targetLength - 30).coerceAtLeast(75)
         val maxLength = (targetLength + 10).coerceAtMost(180)
 
-        val candidateSection = if (hasProfile && profile != null) {
+        val candidateSection = if (hasProfile) {
             val name = profile.fullName.ifBlank { "the applicant" }
             val skills = (profile.skills + profile.techStack)
                 .distinct()

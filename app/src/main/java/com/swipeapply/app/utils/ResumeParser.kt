@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit
 
 object ResumeParser {
     private const val TAG = "ResumeParser"
-    private const val OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-    private const val MODEL = "stepfun/step-3.5-flash:free"
+    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+    private const val MODEL = "llama-3.1-8b-instant"
     
     // OkHttp client with longer timeouts for AI responses
     private val httpClient by lazy {
@@ -39,7 +39,7 @@ object ResumeParser {
     }
 
     /**
-     * Parses a resume from a PDF file using OpenRouter AI.
+     * Parses a resume from a PDF file using Groq AI.
      * Extracts: name, email, phone, bio, skills, techStack, education, experience, projects
      * 
      * @param context Android context for content resolver
@@ -58,16 +58,16 @@ object ResumeParser {
             
             Log.d(TAG, "Extracted ${pdfText.length} characters from PDF")
 
-            // 2. Send to OpenRouter for JSON extraction
-            Log.d(TAG, "Sending resume to OpenRouter ($MODEL) for analysis...")
-            val responseText = callOpenRouter(pdfText)
+            // 2. Send to Groq for JSON extraction
+            Log.d(TAG, "Sending resume to Groq ($MODEL) for analysis...")
+            val responseText = callGroq(pdfText)
             
             if (responseText.isNullOrBlank()) {
-                Log.e(TAG, "OpenRouter returned empty response")
+                Log.e(TAG, "Groq returned empty response")
                 return@withContext null
             }
             
-            Log.d(TAG, "OpenRouter response received: ${responseText.take(200)}...")
+            Log.d(TAG, "Groq response received: ${responseText.take(200)}...")
 
             // 3. Clean and parse JSON
             val cleanedJson = cleanJsonResponse(responseText)
@@ -84,12 +84,12 @@ object ResumeParser {
     }
 
     /**
-     * Calls OpenRouter API with the resume text and returns the AI response.
+     * Calls Groq API with the resume text and returns the AI response.
      */
-    private fun callOpenRouter(resumeText: String): String? {
-        val apiKey = BuildConfig.OPENROUTER_API_KEY
+    private fun callGroq(resumeText: String): String? {
+        val apiKey = BuildConfig.GROQ_API_KEY
         if (apiKey.isBlank()) {
-            Log.e(TAG, "OpenRouter API key is not configured")
+            Log.e(TAG, "Groq API key is not configured")
             return null
         }
         
@@ -109,25 +109,23 @@ object ResumeParser {
         }
         
         val request = Request.Builder()
-            .url(OPENROUTER_URL)
+            .url(GROQ_URL)
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
-            .addHeader("HTTP-Referer", "https://swipeapply.app") // Required by OpenRouter
-            .addHeader("X-Title", "SwipeApply Resume Parser") // App identifier
             .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
         
         return try {
             val response = httpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
+            val responseBody = response.body.string()
             
             if (!response.isSuccessful) {
-                Log.e(TAG, "OpenRouter API error: ${response.code} - $responseBody")
+                Log.e(TAG, "Groq API error: ${response.code} - $responseBody")
                 return null
             }
             
-            // Parse the OpenRouter response to extract the content
-            val jsonResponse = JSONObject(responseBody ?: "")
+            // Parse the Groq response to extract the content
+            val jsonResponse = JSONObject(responseBody)
             val choices = jsonResponse.optJSONArray("choices")
             if (choices != null && choices.length() > 0) {
                 val message = choices.getJSONObject(0).optJSONObject("message")
@@ -136,11 +134,11 @@ object ResumeParser {
                     ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
                 content
             } else {
-                Log.e(TAG, "No choices in OpenRouter response")
+                Log.e(TAG, "No choices in Groq response")
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "OpenRouter HTTP error: ${e.message}", e)
+            Log.e(TAG, "Groq HTTP error: ${e.message}", e)
             null
         }
     }
