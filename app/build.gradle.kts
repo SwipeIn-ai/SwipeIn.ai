@@ -30,12 +30,12 @@ android {
             "\"$geminiKey\""
         )
         
-        // OpenRouter API Key for AI resume parsing
-        val openRouterKey = envProperties.getProperty("OPENROUTER_API_KEY") ?: ""
+        // Groq API key for AI resume parsing and generation
+        val groqApiKey = envProperties.getProperty("GROQ_API_KEY") ?: ""
         buildConfigField(
             "String",
-            "OPENROUTER_API_KEY",
-            "\"$openRouterKey\""
+            "GROQ_API_KEY",
+            "\"$groqApiKey\""
         )
         
         val findworkKey = envProperties.getProperty("FINDWORK_API_KEY") ?: ""
@@ -141,5 +141,5 @@ dependencies {
     // Kotlin Serialization (for parsing AI JSON response)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     
-    // Note: OpenRouter uses OkHttp (already included above) for HTTP calls
+    // Note: Groq uses OkHttp (already included above) for HTTP calls
 }
