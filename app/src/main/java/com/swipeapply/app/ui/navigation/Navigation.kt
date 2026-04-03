@@ -13,6 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -55,10 +60,37 @@ sealed class Screen(val route: String) {
 @Composable
 fun SwipeApplyNavHost(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Onboarding.route,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null
 ) {
+    val context = LocalContext.current
+    var resolvedStartDestination by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(context) {
+        resolvedStartDestination = try {
+            SupabaseClient.client.auth.awaitInitialization()
+            val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+            when {
+                userId == null -> Screen.Onboarding.route
+                JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY).hasUserProfile(userId) -> Screen.Home.route
+                else -> Screen.ProfileCreation.route
+            }
+        } catch (_: Exception) {
+            Screen.Onboarding.route
+        }
+    }
+
+    val startDestination = resolvedStartDestination
+    if (startDestination == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
