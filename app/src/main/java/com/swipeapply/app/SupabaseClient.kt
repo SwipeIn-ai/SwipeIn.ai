@@ -2,6 +2,7 @@ package com.swipeapply.app
 
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.ExternalAuthAction
+import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 
@@ -13,6 +14,10 @@ object SupabaseClient {
         install(Auth) {
             scheme = "swipeapply"
             host = "callback"
+            sessionManager = SettingsSessionManager(key = "swipeapply.auth.session")
+            autoLoadFromStorage = true
+            autoSaveToStorage = true
+            alwaysAutoRefresh = true
             defaultExternalAuthAction = ExternalAuthAction.CustomTabs()
         }
         install(Postgrest)
