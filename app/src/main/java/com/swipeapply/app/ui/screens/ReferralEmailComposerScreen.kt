@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.Employee
+import com.swipeapply.app.ui.components.ShimmerEmailCard
 import com.swipeapply.app.ui.theme.AccentGreen
 import com.swipeapply.app.ui.theme.GradientEnd
 import com.swipeapply.app.ui.theme.GradientStart
@@ -129,6 +130,7 @@ fun ReferralEmailComposerScreen(
     val viewModel: ReferralEmailViewModel = viewModel(factory = ViewModelFactory(application))
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank() && uiState.toEmail.isBlank()
 
     var isCopied by remember { mutableStateOf(false) }
 
@@ -268,18 +270,22 @@ fun ReferralEmailComposerScreen(
             }
 
             // Email Composer Card
-            EmailComposerCard(
-                uiState = uiState,
-                onFromNameChange = viewModel::updateFromName,
-                onFromEmailChange = viewModel::updateFromEmail,
-                onToNameChange = viewModel::updateToName,
-                onToEmailChange = viewModel::updateToEmail,
-                onSubjectChange = viewModel::updateSubject,
-                onBodyChange = viewModel::updateBody,
-                onToggleFrom = viewModel::toggleFromField,
-                isGenerating = uiState.isGenerating,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            )
+            if (showEmailSkeleton) {
+                ShimmerEmailCard(modifier = Modifier.padding(horizontal = 20.dp))
+            } else {
+                EmailComposerCard(
+                    uiState = uiState,
+                    onFromNameChange = viewModel::updateFromName,
+                    onFromEmailChange = viewModel::updateFromEmail,
+                    onToNameChange = viewModel::updateToName,
+                    onToEmailChange = viewModel::updateToEmail,
+                    onSubjectChange = viewModel::updateSubject,
+                    onBodyChange = viewModel::updateBody,
+                    onToggleFrom = viewModel::toggleFromField,
+                    isGenerating = uiState.isGenerating,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
