@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -54,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.ApplicationStatus
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.ui.components.ShimmerSavedJobCard
 import com.swipeapply.app.ui.theme.AccentGreen
 import com.swipeapply.app.ui.theme.AccentRed
 import com.swipeapply.app.ui.theme.GradientStart
@@ -163,8 +163,15 @@ fun SavedJobsScreen(
 
         when {
             uiState.isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = GradientStart)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(4) {
+                        ShimmerSavedJobCard()
+                    }
                 }
             }
 

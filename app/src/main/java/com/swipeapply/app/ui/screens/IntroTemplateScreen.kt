@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.JobCard
+import com.swipeapply.app.ui.components.ShimmerEmailCard
 import com.swipeapply.app.ui.theme.AccentGreen
 import com.swipeapply.app.ui.theme.GradientEnd
 import com.swipeapply.app.ui.theme.GradientStart
@@ -87,6 +88,7 @@ fun IntroTemplateScreen(
     val context = LocalContext.current
     val view = LocalView.current
     val scrollState = rememberScrollState()
+    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank()
 
     LaunchedEffect(jobCard) {
         viewModel.initializeAndGenerate(jobCard)
@@ -173,30 +175,34 @@ fun IntroTemplateScreen(
             }
 
             // Email card with generating shimmer border
-            Box(modifier = Modifier.fillMaxWidth()) {
-                val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-                val shimmerAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.3f, targetValue = 1f,
-                    animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-                    label = "shimmerAlpha"
-                )
-                val borderColor = if (uiState.isGenerating)
-                    GradientStart.copy(alpha = shimmerAlpha)
-                else
-                    androidx.compose.ui.graphics.Color.Transparent
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(1.5.dp, borderColor, RoundedCornerShape(20.dp))
-                ) {
-                    EmailPreviewCard(
-                        subject = uiState.subject,
-                        body = uiState.body,
-                        onSubjectChange = { viewModel.updateSubject(it) },
-                        onBodyChange = { viewModel.updateBody(it) }
+            if (showEmailSkeleton) {
+                ShimmerEmailCard(modifier = Modifier.fillMaxWidth())
+            } else {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+                    val shimmerAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.3f, targetValue = 1f,
+                        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
+                        label = "shimmerAlpha"
                     )
+                    val borderColor = if (uiState.isGenerating)
+                        GradientStart.copy(alpha = shimmerAlpha)
+                    else
+                        androidx.compose.ui.graphics.Color.Transparent
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(1.5.dp, borderColor, RoundedCornerShape(20.dp))
+                    ) {
+                        EmailPreviewCard(
+                            subject = uiState.subject,
+                            body = uiState.body,
+                            onSubjectChange = { viewModel.updateSubject(it) },
+                            onBodyChange = { viewModel.updateBody(it) }
+                        )
+                    }
                 }
             }
 

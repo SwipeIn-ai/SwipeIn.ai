@@ -119,6 +119,7 @@ fun ReferralEmailComposerContent(
     )
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank() && uiState.toEmail.isBlank()
 
     var isCopied by remember { mutableStateOf(false) }
 
@@ -247,15 +248,19 @@ fun ReferralEmailComposerContent(
         }
 
         // Email composer form
-        EmailComposerForm(
-            uiState = uiState,
-            onFromNameChange = viewModel::updateFromName,
-            onFromEmailChange = viewModel::updateFromEmail,
-            onSubjectChange = viewModel::updateSubject,
-            onBodyChange = viewModel::updateBody,
-            onToggleFrom = viewModel::toggleFromField,
-            isGenerating = uiState.isGenerating
-        )
+        if (showEmailSkeleton) {
+            ShimmerEmailCard()
+        } else {
+            EmailComposerForm(
+                uiState = uiState,
+                onFromNameChange = viewModel::updateFromName,
+                onFromEmailChange = viewModel::updateFromEmail,
+                onSubjectChange = viewModel::updateSubject,
+                onBodyChange = viewModel::updateBody,
+                onToggleFrom = viewModel::toggleFromField,
+                isGenerating = uiState.isGenerating
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
