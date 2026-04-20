@@ -6,12 +6,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.ai.ReferralTemplateGenerator
+import com.swipeapply.app.data.manager.GroqConsentManager
 import com.swipeapply.app.data.model.EducationItem
 import com.swipeapply.app.data.model.Employee
 import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.ProjectItem
 import com.swipeapply.app.data.model.ReferralEmail
 import com.swipeapply.app.data.model.UserProfile
+import com.swipeapply.app.notifications.NotificationScheduler
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +50,8 @@ data class ReferralEmailUiState(
     val isEmailSent: Boolean = false,
     val generationError: String? = null,
     val aiGenerated: Boolean = false,
-    val showFromField: Boolean = false  // Toggle to show/hide "From" editor
+    val showFromField: Boolean = false,  // Toggle to show/hide "From" editor
+    val requiresGroqConsent: Boolean = false
 ) {
     /**
      * Build a ReferralEmail object from current state.
@@ -95,6 +98,7 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
         isLenient = true
         coerceInputValues = true
     }
+    private val consentManager = GroqConsentManager.getInstance(application)
 
     private var currentEmployee: Employee? = null
     private var cachedProfile: UserProfile? = null
@@ -104,7 +108,7 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
 
     /**
      * Initialize the composer with employee and company details.
-     * Immediately shows a static template, then generates AI version.
+     * Requests a Groq-generated draft without static template prefill.
      */
     fun initialize(
         employee: Employee,
@@ -112,9 +116,8 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
         jobTitle: String? = null
     ) {
         currentEmployee = employee
-        
-        // Set initial state with static template
-        val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
+
+        // Set target context, then populate subject/body only from Groq.
         _uiState.update {
             it.copy(
                 toName = employee.fullName,
@@ -122,14 +125,18 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
                 companyName = companyName,
                 jobTitle = jobTitle,
                 employeeRole = employee.jobTitle,
-                subject = if (jobTitle != null) "Quick question about $jobTitle" 
-                         else "Quick question about $companyName",
-                body = buildQuickTemplate(firstName, companyName, employee.jobTitle, jobTitle),
-                isGenerating = false,
+                subject = "",
+                body = "",
+                isGenerating = consentManager.hasOutreachConsent(),
                 aiGenerated = false,
                 generationError = null,
-                isEmailSent = false
+                isEmailSent = false,
+                requiresGroqConsent = !consentManager.hasOutreachConsent()
             )
+        }
+
+        if (!consentManager.hasOutreachConsent()) {
+            return
         }
         
         // Fetch profile and generate AI email
@@ -142,11 +149,49 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
      * Regenerate the email with AI.
      */
     fun regenerate() {
+        if (!consentManager.hasOutreachConsent()) {
+            _uiState.update {
+                it.copy(
+                    requiresGroqConsent = true,
+                    isGenerating = false,
+                    generationError = "Consent is required to generate with Groq."
+                )
+            }
+            return
+        }
+
         val employee = currentEmployee ?: return
         val state = _uiState.value
         
         viewModelScope.launch {
             generateEmail(employee, state.companyName, state.jobTitle)
+        }
+    }
+
+    fun grantGroqConsent() {
+        consentManager.grantOutreachConsent()
+        _uiState.update {
+            it.copy(
+                requiresGroqConsent = false,
+                generationError = null,
+                isGenerating = true
+            )
+        }
+
+        val employee = currentEmployee ?: return
+        val state = _uiState.value
+        viewModelScope.launch {
+            fetchProfileThenGenerate(employee, state.companyName, state.jobTitle)
+        }
+    }
+
+    fun declineGroqConsent() {
+        _uiState.update {
+            it.copy(
+                requiresGroqConsent = true,
+                isGenerating = false,
+                generationError = "Consent is required before sharing profile data with Groq."
+            )
         }
     }
 
@@ -182,6 +227,14 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun markEmailSent() {
+        val state = _uiState.value
+
+        NotificationScheduler.scheduleIntroFollowUp(
+            context = getApplication(),
+            recipientName = state.toName,
+            companyName = state.companyName
+        )
+
         _uiState.update { it.copy(isEmailSent = true) }
     }
 
@@ -225,12 +278,24 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
         companyName: String,
         jobTitle: String?
     ) {
+        if (!hasPersonalizationProfile(cachedProfile)) {
+            _uiState.update {
+                it.copy(
+                    isGenerating = false,
+                    aiGenerated = false,
+                    generationError = "Add your parsed resume details in Profile to generate a personalized outreach email."
+                )
+            }
+            return
+        }
+        val personalizationProfile = cachedProfile ?: return
+
         _uiState.update { it.copy(isGenerating = true, generationError = null) }
 
         val result = ReferralTemplateGenerator.generate(
             employee = employee,
             companyName = companyName,
-            userProfile = cachedProfile,
+            userProfile = personalizationProfile,
             jobTitle = jobTitle
         )
 
@@ -246,14 +311,23 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
                 )
             }
         } else {
-            Log.w(TAG, "AI generation failed — keeping current template")
+            Log.w(TAG, "Groq generation failed")
             _uiState.update {
                 it.copy(
                     isGenerating = false, 
-                    generationError = "AI unavailable — you can edit the template below."
+                    generationError = "Groq could not generate a template. Check API key/network and retry."
                 )
             }
         }
+    }
+
+    private fun hasPersonalizationProfile(profile: UserProfile?): Boolean {
+        if (profile == null) return false
+        return profile.skills.isNotEmpty() ||
+            profile.techStack.isNotEmpty() ||
+            profile.experience.isNotEmpty() ||
+            profile.projects.isNotEmpty() ||
+            profile.bio.isNotBlank()
     }
 
     private suspend fun fetchProfile(): UserProfile? = withContext(Dispatchers.IO) {
@@ -286,32 +360,6 @@ class ReferralEmailViewModel(application: Application) : AndroidViewModel(applic
             Log.e(TAG, "Profile fetch failed: ${e.message}")
             null
         }
-    }
-
-    private fun buildQuickTemplate(
-        firstName: String,
-        companyName: String,
-        employeeRole: String?,
-        jobTitle: String?
-    ): String {
-        val roleContext = if (jobTitle != null) {
-            "the $jobTitle role"
-        } else {
-            "the open positions"
-        }
-        
-        return """
-Hi $firstName,
-
-I came across your profile and noticed you're a ${employeeRole ?: "professional"} at $companyName. I'm interested in $roleContext and would love to learn more about your experience there.
-
-Would you be open to a quick chat, or if comfortable, considering a referral?
-
-Thanks so much for your time!
-
-Best,
-
-        """.trimIndent()
     }
 
     @Serializable

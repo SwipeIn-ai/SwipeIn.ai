@@ -135,6 +135,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // Background scheduling for notification services
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
     // PDFBox for PDF text extraction
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     

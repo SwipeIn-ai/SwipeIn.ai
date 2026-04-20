@@ -47,9 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,6 +85,8 @@ private val NavPurple = Color(0xFF8B5CF6)
  */
 @Composable
 fun MainScaffold(
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
     onCardClicked: (JobCard) -> Unit,
     onRequestIntro: (JobCard) -> Unit,
     onNavigateToEmployeeFinder: (String) -> Unit,
@@ -97,7 +96,6 @@ fun MainScaffold(
     isDarkModeEnabled: Boolean?,
     modifier: Modifier = Modifier
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
     val savedCount by SavedContactsRepository.companies.collectAsState()
     val totalSaved = savedCount.sumOf { it.contacts.size }
 
@@ -137,7 +135,6 @@ fun MainScaffold(
                             modifier = Modifier.fillMaxSize()
                         )
                         1 -> SavedJobsScreen(
-                            onRequestIntro = onRequestIntro,
                             onNavigateToEmployeeFinder = onNavigateToEmployeeFinder,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -150,7 +147,7 @@ fun MainScaffold(
             BottomNavBar(
                 selectedIndex = selectedTabIndex,
                 contactsBadgeCount = totalSaved,
-                onTabSelected = { selectedTabIndex = it }
+                onTabSelected = onTabSelected
             )
         }
     }

@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
@@ -112,6 +113,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.swipeapply.app.SupabaseClient
+import com.swipeapply.app.data.manager.GroqConsentManager
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.LocationType
 import com.swipeapply.app.data.model.SwipeDirection
@@ -151,9 +153,11 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val supabase = SupabaseClient.client
+    val groqConsentManager = remember(application) { GroqConsentManager.getInstance(application) }
 
     // Track the last right-swiped company for referral navigation
     var lastRightSwipedCompany by remember { mutableStateOf<String?>(null) }
+    var isGroqConsentEnabled by remember { mutableStateOf(groqConsentManager.hasOutreachConsent()) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -191,6 +195,12 @@ fun HomeScreen(
             HomeQuickFilter.HYBRID -> uiState.cards.filter { it.locationType == LocationType.HYBRID }
             HomeQuickFilter.ONSITE -> uiState.cards.filter { it.locationType == LocationType.ONSITE }
             HomeQuickFilter.TECH_STACK -> uiState.cards.filter { it.techStack.isNotEmpty() }
+        }
+    }
+
+    LaunchedEffect(showSettingsSheet) {
+        if (showSettingsSheet) {
+            isGroqConsentEnabled = groqConsentManager.hasOutreachConsent()
         }
     }
 
@@ -333,6 +343,25 @@ fun HomeScreen(
                     isDarkMode = isDarkModeEnabled ?: false,
                     onDarkModeToggle = { enabled ->
                         onDarkModeToggle(if (enabled) true else false)
+                    },
+                    isGroqConsentEnabled = isGroqConsentEnabled,
+                    onGroqConsentToggle = { enabled ->
+                        if (enabled) {
+                            groqConsentManager.grantOutreachConsent()
+                        } else {
+                            groqConsentManager.revokeOutreachConsent()
+                        }
+                        isGroqConsentEnabled = enabled
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = if (enabled) {
+                                    "Groq outreach personalization enabled."
+                                } else {
+                                    "Groq outreach personalization disabled."
+                                },
+                                duration = SnackbarDuration.Short
+                            )
+                        }
                     },
                     isRankingEnabled = uiState.isRankingEnabled,
                     onToggleRanking = { viewModel.toggleRanking() },
@@ -633,6 +662,8 @@ private fun HomeTopBar(
 private fun SettingsSheet(
     isDarkMode: Boolean,
     onDarkModeToggle: (Boolean) -> Unit,
+    isGroqConsentEnabled: Boolean,
+    onGroqConsentToggle: (Boolean) -> Unit,
     isRankingEnabled: Boolean,
     onToggleRanking: () -> Unit,
     isRanking: Boolean,
@@ -674,6 +705,31 @@ private fun SettingsSheet(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (isDarkMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        )
+
+        SettingsItem(
+            icon = Icons.Default.Lock,
+            title = "Groq Personalization",
+            subtitle = if (isGroqConsentEnabled) {
+                "Profile sharing for outreach is enabled"
+            } else {
+                "Profile sharing for outreach is disabled"
+            },
+            onClick = { onGroqConsentToggle(!isGroqConsentEnabled) },
+            trailing = {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isGroqConsentEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = if (isGroqConsentEnabled) "ON" else "OFF",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isGroqConsentEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -1240,7 +1296,7 @@ private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onReques
                 }
             }
 
-            // Primary — Make your move
+            // Primary action: send intro
             Box(
                 modifier = Modifier.weight(1f).height(56.dp).background(
                     brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
@@ -1250,7 +1306,7 @@ private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onReques
             ) {
                 TextButton(onClick = onRequestIntro, modifier = Modifier.fillMaxSize()) {
                     Text(
-                        text = "Make your move",
+                        text = "Send intro",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White

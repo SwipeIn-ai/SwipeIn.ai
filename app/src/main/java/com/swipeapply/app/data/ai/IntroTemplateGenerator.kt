@@ -41,11 +41,11 @@ object IntroTemplateGenerator {
         val body: String
     )
 
-    suspend fun generate(jobCard: JobCard, profile: UserProfile?): GeneratedTemplate? =
+    suspend fun generate(jobCard: JobCard, profile: UserProfile): GeneratedTemplate? =
         withContext(Dispatchers.IO) {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) {
-                Log.e(TAG, "Groq API key not configured - falling back to static template")
+                Log.e(TAG, "Groq API key not configured")
                 return@withContext null
             }
 
@@ -63,7 +63,7 @@ object IntroTemplateGenerator {
                         put("content", systemInstruction + prompt)
                     })
                 })
-                put("temperature", 0.7)
+                put("temperature", 0.2)
                 put("max_tokens", 512)
             }
 
@@ -92,49 +92,47 @@ object IntroTemplateGenerator {
                     ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
                     ?: return@withContext null
 
-                parseResponse(content, jobCard, profile)
+                parseResponse(content, jobCard)
             } catch (e: Exception) {
                 Log.e(TAG, "Generation failed: ${e.message}", e)
                 null
             }
         }
 
-    private fun buildPrompt(job: JobCard, profile: UserProfile?): String {
-        val hasProfile = profile != null &&
-            (profile.fullName.isNotBlank() || profile.skills.isNotEmpty() || profile.experience.isNotEmpty())
+    private fun buildPrompt(job: JobCard, profile: UserProfile): String {
+        val name = profile.fullName.ifBlank { "the applicant" }
+        val skills = (profile.skills + profile.techStack)
+            .distinct()
+            .take(8)
+            .joinToString(", ")
+            .ifBlank { "not specified" }
+        val latestRole = profile.experience.firstOrNull()
+            ?.let { "${it.role} at ${it.company} (${it.duration})" } ?: "not specified"
+        val projectHighlight = profile.projects.firstOrNull()
+            ?.let { project ->
+                buildString {
+                    append(project.name.ifBlank { "Project not named" })
+                    if (project.techUsed.isNotBlank()) append(" (${project.techUsed})")
+                    if (project.description.isNotBlank()) append(": ${project.description}")
+                }.take(180)
+            } ?: "not specified"
+        val bio = profile.bio.take(200).ifBlank { "not specified" }
 
-        val candidateSection = if (hasProfile) {
-            val name = profile.fullName.ifBlank { "the applicant" }
-            val skills = (profile.skills + profile.techStack)
-                .distinct()
-                .take(8)
-                .joinToString(", ")
-                .ifBlank { "not specified" }
-            val latestRole = profile.experience.firstOrNull()
-                ?.let { "${it.role} at ${it.company} (${it.duration})" } ?: "not specified"
-            val bio = profile.bio.take(200).ifBlank { "" }
-
-            """
+        val candidateSection = """
 CANDIDATE:
 - Name: $name
 - Most recent role: $latestRole
 - Top skills: $skills
-${if (bio.isNotBlank()) "- About: $bio" else ""}
-            """.trimIndent()
-        } else {
-            "CANDIDATE: No profile provided - write for a strong but anonymous candidate."
-        }
+- Project highlight: $projectHighlight
+- About: $bio
+        """.trimIndent()
 
-        val overlap = if (profile != null) {
-            val allSkills = (profile.skills + profile.techStack).map { it.lowercase() }
-            job.techStack.filter { tech ->
-                allSkills.any { skill ->
-                    skill.contains(tech.lowercase()) || tech.lowercase().contains(skill)
-                }
-            }.take(3).joinToString(", ")
-        } else {
-            ""
-        }
+        val allSkills = (profile.skills + profile.techStack).map { it.lowercase() }
+        val overlap = job.techStack.filter { tech ->
+            allSkills.any { skill ->
+                skill.contains(tech.lowercase()) || tech.lowercase().contains(skill)
+            }
+        }.take(3).joinToString(", ")
 
         return """
 You are writing a cold outreach email for a job application. Follow ALL rules below:
@@ -148,6 +146,7 @@ RULES:
 6. Sign-off: just "Best," then a blank line for name.
 7. Do NOT use: "I hope this finds you well", "I'm passionate about", "leverage", "synergy", "exciting opportunity", "would be a great fit".
 8. Write in first person. Sound human. No em dashes.
+9. Personalization is mandatory: include at least two candidate-specific facts from the profile section.
 
 $candidateSection
 
@@ -167,23 +166,93 @@ BODY:
         """.trimIndent()
     }
 
-    private fun parseResponse(raw: String, job: JobCard, profile: UserProfile?): GeneratedTemplate {
+    private fun parseResponse(raw: String, job: JobCard): GeneratedTemplate? {
         val cleaned = raw
             .replace(Regex("<think>[\\s\\S]*?</think>"), "")
             .replace(Regex("\\[THINKING\\][\\s\\S]*?\\[/THINKING\\]"), "")
+            .replace("```", "")
             .trim()
 
-        val subjectRegex = Regex("SUBJECT:\\s*(.+)", RegexOption.IGNORE_CASE)
-        val bodyRegex = Regex("BODY:\\s*([\\s\\S]+)", RegexOption.IGNORE_CASE)
+        val (parsedSubject, parsedBody) = extractSubjectAndBody(cleaned)
+        val body = parsedBody?.trim().takeIf { !it.isNullOrBlank() }
 
-        val subject = subjectRegex.find(cleaned)?.groupValues?.get(1)?.trim()
-        val body = bodyRegex.find(cleaned)?.groupValues?.get(1)?.trim()
+        if (body == null) {
+            Log.w(TAG, "Groq response could not be parsed into email body")
+            return null
+        }
 
-        return GeneratedTemplate(
-            subject = subject ?: "${job.title} - ${profile?.fullName?.split(" ")?.firstOrNull() ?: "Introduction"}",
-            body = body ?: cleaned.ifBlank {
-                "Hi,\n\nI came across the ${job.title} role at ${job.company.name} and wanted to reach out directly.\n\nMy background in ${job.techStack.take(2).joinToString(" and ").ifBlank { "this space" }} aligns well with what you're building, and I'd love to learn more.\n\nWould you have 15 minutes for a quick chat?\n\nBest,"
+        val subject = parsedSubject?.trim().takeUnless { it.isNullOrBlank() }
+            ?: deriveSubjectFromBody(body, job.title)
+
+        return GeneratedTemplate(subject = subject, body = body)
+    }
+
+    private fun extractSubjectAndBody(text: String): Pair<String?, String?> {
+        val labeledSubject = Regex("(?im)^subject\\s*[:\\-]\\s*(.+)$")
+            .find(text)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
+        val labeledBody = Regex("(?is)\\bbody\\s*[:\\-]\\s*(.+)$")
+            .find(text)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
+
+        if (!labeledBody.isNullOrBlank()) {
+            return labeledSubject to labeledBody
+        }
+
+        val jsonObjectText = extractJsonObject(text)
+        if (jsonObjectText != null) {
+            runCatching {
+                val json = JSONObject(jsonObjectText)
+                val jsonSubject = json.optString("subject")
+                    .ifBlank { json.optString("SUBJECT") }
+                    .ifBlank { null }
+                val jsonBody = json.optString("body")
+                    .ifBlank { json.optString("BODY") }
+                    .ifBlank { json.optString("message") }
+                    .ifBlank { null }
+
+                if (!jsonBody.isNullOrBlank()) {
+                    return jsonSubject to jsonBody
+                }
             }
-        )
+        }
+
+        // Fallback: treat plain model output as body text.
+        return null to text
+    }
+
+    private fun extractJsonObject(text: String): String? {
+        val start = text.indexOf('{')
+        val end = text.lastIndexOf('}')
+        if (start == -1 || end == -1 || end <= start) return null
+        return text.substring(start, end + 1)
+    }
+
+    private fun deriveSubjectFromBody(body: String, fallbackHint: String): String {
+        val firstMeaningfulLine = body
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { line ->
+                line.isNotBlank() &&
+                    !line.startsWith("hi ", ignoreCase = true) &&
+                    !line.startsWith("hello", ignoreCase = true)
+            }
+            ?: body
+
+        val words = firstMeaningfulLine
+            .replace(Regex("[^A-Za-z0-9 ]"), " ")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+
+        val dynamic = words.take(6).joinToString(" ").trim()
+        return if (dynamic.isNotBlank()) {
+            dynamic.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        } else {
+            "$fallbackHint Intro"
+        }
     }
 }

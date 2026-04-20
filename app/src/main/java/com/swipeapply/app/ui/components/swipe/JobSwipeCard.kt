@@ -26,9 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -325,22 +323,6 @@ private fun BadgesRow(jobCard: JobCard) {
             bg = BrandMuted.copy(alpha = 0.5f),
             textColor = BrandForeground
         )
-        if (jobCard.locationType.label == "Remote") {
-            BadgeChip(
-                icon = Icons.Default.Home,
-                text = "Remote",
-                bg = BrandSecondary.copy(alpha = 0.4f),
-                textColor = BrandPrimary,
-                borderColor = BrandPrimary.copy(alpha = 0.1f)
-            )
-        }
-        // Mocking salary for now since it's in UI
-        BadgeChip(
-            icon = Icons.Default.MonetizationOn,
-            text = "$120k - $180k",
-            bg = BrandMuted.copy(alpha = 0.5f),
-            textColor = BrandForeground
-        )
     }
 }
 
@@ -418,13 +400,7 @@ private fun SwipeOverlay(direction: SwipeDirection, progress: Float) {
                         border = BorderStroke(4.dp, BrandPrimary.copy(alpha = overlayAlpha)),
                         modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = -15f }
                     ) {
-                        Text(
-                            text = "APPLY",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            color = BrandPrimary.copy(alpha = overlayAlpha),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
+                        Box(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp))
                     }
                 }
                 SwipeDirection.LEFT -> {
@@ -434,13 +410,7 @@ private fun SwipeOverlay(direction: SwipeDirection, progress: Float) {
                         border = BorderStroke(4.dp, MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha)),
                         modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = 15f }
                     ) {
-                        Text(
-                            text = "NOPE",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
+                        Box(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp))
                     }
                 }
                 SwipeDirection.NONE -> { }

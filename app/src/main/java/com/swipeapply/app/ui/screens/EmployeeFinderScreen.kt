@@ -373,7 +373,7 @@ private fun EmployeeFinderTopBar(
                 }
                 Column {
                     Text(
-                        text = "Find Referrals",
+                        text = "Find Emails",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
@@ -696,7 +696,7 @@ private fun LoadingState() {
 
             // Heading
             Text(
-                text = "Finding Referral Contacts",
+                text = "Finding Intro Contacts",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -1075,7 +1075,7 @@ private fun EmployeeDetailSheet(
                     Surface(shape = CircleShape, color = BrandSecondary, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Verified, null, tint = BrandPrimary, modifier = Modifier.padding(6.dp)) // Magic stick mock
                     }
-                    Text("AI Referral Assistant", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
+                    Text("AI Intro Assistant", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
                 }
                 Surface(shape = RoundedCornerShape(6.dp), color = BrandSecondary.copy(alpha = 0.5f), border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f))) {
                     Text("DRAFT READY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = BrandPrimary, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
@@ -1092,7 +1092,7 @@ private fun EmployeeDetailSheet(
                 Box(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                     val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
                     Text(
-                        text = "Hi $firstName,\n\nI noticed you work at $companyName and I'm very interested in the roles that recently opened up. I've been working in the industry for a while and would love to connect and learn more about your experience there.\n\nWould you be open to a brief chat or considering a referral?",
+                        text = "Hi $firstName,\n\nI noticed you work at $companyName and I am interested in the roles that recently opened up. I would love to connect and learn more about your experience there.\n\nWould you be open to a brief chat or guidance on the best intro path?",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = BrandForeground.copy(alpha = 0.9f),
@@ -1136,7 +1136,7 @@ private fun EmployeeDetailSheet(
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
                     Icon(Icons.Default.Email, null, tint = Color.White, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Send Referral", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Send Intro", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
