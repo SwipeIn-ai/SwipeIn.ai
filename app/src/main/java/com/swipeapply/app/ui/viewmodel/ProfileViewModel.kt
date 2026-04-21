@@ -11,6 +11,8 @@ import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.ProjectItem
 import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.repository.JobRepository
+import com.swipeapply.app.utils.ResumeParser
+import com.swipeapply.app.utils.ResumeParserV2
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -309,11 +311,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, saveSuccess = false) }
 
-            val result = com.swipeapply.app.utils.ResumeParserV2.parseResume(
-                context = context,
-                uri = uri,
-                onProgress = { _, _ -> }
-            )
+            val result = ResumeParser.parseResume(context, uri)
+                ?: ResumeParserV2.parseResume(
+                    context = context,
+                    uri = uri,
+                    onProgress = { _, _ -> }
+                )
 
             if (result != null) {
                 // Keep the old user name/email if parser didn't find them and they exist
@@ -340,7 +343,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Could not parse resume."
+                        error = "Could not parse resume with Groq or local parser."
                     )
                 }
             }

@@ -93,7 +93,7 @@ private val ComposerCyan = Color(0xFF06B6D4)
 private val SuccessGreen = Color(0xFF10B981)
 
 /**
- * Bottom Sheet content for composing and sending a cold referral email.
+ * Bottom Sheet content for composing and sending a cold intro email.
  * 
  * Features:
  * - AI-generated personalized template
@@ -119,7 +119,7 @@ fun ReferralEmailComposerContent(
     )
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
-    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank() && uiState.toEmail.isBlank()
+    val showEmailSkeleton = uiState.isGenerating && uiState.subject.isBlank() && uiState.body.isBlank()
 
     var isCopied by remember { mutableStateOf(false) }
 
@@ -156,7 +156,7 @@ fun ReferralEmailComposerContent(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Compose Referral",
+                    text = "Compose Intro",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -198,7 +198,7 @@ fun ReferralEmailComposerContent(
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.regenerate()
                 },
-                enabled = !uiState.isGenerating
+                enabled = !uiState.isGenerating && !uiState.requiresGroqConsent
             ) {
                 if (uiState.isGenerating) {
                     CircularProgressIndicator(
@@ -214,6 +214,25 @@ fun ReferralEmailComposerContent(
                     )
                 }
             }
+        }
+
+        if (uiState.requiresGroqConsent) {
+            GroqConsentScreen(
+                onAllow = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    viewModel.grantGroqConsent()
+                },
+                onDecline = {
+                    viewModel.declineGroqConsent()
+                    onDismiss()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+            return@Column
         }
 
         // Recipient info card
@@ -285,10 +304,11 @@ fun ReferralEmailComposerContent(
 
         // Helper text
         Text(
-            text = if (uiState.aiGenerated)
-                "✨ Personalized using your profile. Edit freely before sending."
-            else
-                "Edit the template above, then send via your email app.",
+            text = when {
+                uiState.aiGenerated -> "Edit freely before sending."
+                uiState.isGenerating -> "Generating customized draft...This may take a moment."
+                else -> "No draft yet. Tap regenerate to request a Groq template."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth(),
@@ -681,7 +701,7 @@ private fun ActionButtons(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Send Referral",
+                        text = "Send Intro",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (isValid) Color.White

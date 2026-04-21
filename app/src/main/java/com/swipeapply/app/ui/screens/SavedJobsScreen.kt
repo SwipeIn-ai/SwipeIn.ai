@@ -20,14 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -56,7 +54,6 @@ import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.ui.components.ShimmerSavedJobCard
 import com.swipeapply.app.ui.theme.AccentGreen
 import com.swipeapply.app.ui.theme.AccentRed
-import com.swipeapply.app.ui.theme.GradientStart
 import com.swipeapply.app.ui.viewmodel.SavedJobItem
 import com.swipeapply.app.ui.viewmodel.SavedJobsViewModel
 import com.swipeapply.app.ui.viewmodel.ViewModelFactory
@@ -73,7 +70,6 @@ private enum class SavedJobsFilter(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SavedJobsScreen(
-    onRequestIntro: (JobCard) -> Unit,
     onNavigateToEmployeeFinder: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -217,7 +213,6 @@ fun SavedJobsScreen(
                         SavedJobCard(
                             item = item,
                             onUpdateStatus = { status -> viewModel.updateStatus(item.card.id, status) },
-                            onRequestIntro = { onRequestIntro(item.card) },
                             onFindPeople = { onNavigateToEmployeeFinder(item.card.company.name) }
                         )
                     }
@@ -231,7 +226,6 @@ fun SavedJobsScreen(
 private fun SavedJobCard(
     item: SavedJobItem,
     onUpdateStatus: (ApplicationStatus) -> Unit,
-    onRequestIntro: () -> Unit,
     onFindPeople: () -> Unit
 ) {
     Surface(
@@ -293,24 +287,13 @@ private fun SavedJobCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onFindPeople,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Group, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Find people")
-                }
-                Button(
-                    onClick = onRequestIntro,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = GradientStart)
-                ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Intro")
-                }
+            Button(
+                onClick = onFindPeople,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Group, contentDescription = null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Find people")
             }
         }
     }

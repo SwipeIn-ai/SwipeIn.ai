@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.HapticFeedbackConstants
+import com.swipeapply.app.ui.components.GroqConsentScreen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -88,7 +89,7 @@ fun IntroTemplateScreen(
     val context = LocalContext.current
     val view = LocalView.current
     val scrollState = rememberScrollState()
-    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank()
+    val showEmailSkeleton = uiState.isGenerating && uiState.subject.isBlank() && uiState.body.isBlank()
 
     LaunchedEffect(jobCard) {
         viewModel.initializeAndGenerate(jobCard)
@@ -131,7 +132,7 @@ fun IntroTemplateScreen(
                     // Regenerate button
                     IconButton(
                         onClick = { viewModel.regenerate() },
-                        enabled = !uiState.isGenerating
+                        enabled = !uiState.isGenerating && !uiState.requiresGroqConsent
                     ) {
                         if (uiState.isGenerating) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = GradientStart)
@@ -155,6 +156,24 @@ fun IntroTemplateScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             CompanyContextCard(jobCard = jobCard)
+
+            if (uiState.requiresGroqConsent) {
+                GroqConsentScreen(
+                    onAllow = {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        viewModel.grantGroqConsent()
+                    },
+                    onDecline = {
+                        viewModel.declineGroqConsent()
+                        onBack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                return@Column
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -220,8 +239,11 @@ fun IntroTemplateScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = if (uiState.aiGenerated) "AI-personalised based on your profile. Edit freely."
-                        else "Edit the template above, then copy and send.",
+                text = when {
+                    uiState.aiGenerated -> "Groq-personalized from your profile. Edit freely before sending."
+                    uiState.isGenerating -> "Generating draft with Groq..."
+                    else -> "No draft yet. Tap regenerate to request a Groq template."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.fillMaxWidth(),

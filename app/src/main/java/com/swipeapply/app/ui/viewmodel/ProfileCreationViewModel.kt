@@ -10,6 +10,7 @@ import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
 import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.repository.JobRepository
+import com.swipeapply.app.utils.ResumeParser
 import com.swipeapply.app.utils.ResumeParserV2
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,13 +44,26 @@ class ProfileCreationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, parseProgress = 0f, parseStage = "") }
 
-            val result = ResumeParserV2.parseResume(
-                context = context,
-                uri = uri,
-                onProgress = { progress, stage ->
-                    _uiState.update { it.copy(parseProgress = progress, parseStage = stage) }
+            _uiState.update {
+                it.copy(parseProgress = 0.1f, parseStage = "Analyzing resume with Groq...")
+            }
+
+            val result = ResumeParser.parseResume(context, uri) ?: run {
+                _uiState.update {
+                    it.copy(parseProgress = 0.2f, parseStage = "Groq unavailable, using local parser...")
                 }
-            )
+
+                ResumeParserV2.parseResume(
+                    context = context,
+                    uri = uri,
+                    onProgress = { progress, stage ->
+                        val mappedProgress = 0.2f + (progress * 0.8f)
+                        _uiState.update {
+                            it.copy(parseProgress = mappedProgress.coerceIn(0f, 1f), parseStage = stage)
+                        }
+                    }
+                )
+            }
 
             if (result != null) {
                 Log.d("ProfileCreationVM", "Resume parsed successfully: ${result.fullName}")
@@ -60,7 +74,7 @@ class ProfileCreationViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Could not parse resume. Please fill manually.",
+                        error = "Could not parse resume with Groq or local parser. Please fill manually.",
                         profile = UserProfile(),
                         parseProgress = 0f,
                         parseStage = ""

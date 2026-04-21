@@ -44,14 +44,14 @@ object ReferralTemplateGenerator {
     suspend fun generate(
         employee: Employee,
         companyName: String,
-        userProfile: UserProfile?,
+        userProfile: UserProfile,
         jobTitle: String? = null,
         config: ReferralEmailConfig = ReferralEmailConfig()
     ): ReferralEmail? = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GROQ_API_KEY
         if (apiKey.isBlank()) {
-            Log.e(TAG, "Groq API key not configured - using fallback template")
-            return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
+            Log.e(TAG, "Groq API key not configured")
+            return@withContext null
         }
 
         val prompt = buildPrompt(employee, companyName, userProfile, jobTitle, config)
@@ -64,7 +64,7 @@ object ReferralTemplateGenerator {
                     put("content", prompt)
                 })
             })
-            put("temperature", 0.35)
+            put("temperature", 0.2)
             put("max_tokens", 600)
         }
 
@@ -81,7 +81,7 @@ object ReferralTemplateGenerator {
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "Groq error ${response.code}: $body")
-                return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
+                return@withContext null
             }
 
             val message = JSONObject(body)
@@ -91,34 +91,31 @@ object ReferralTemplateGenerator {
 
             val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
                 ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: return@withContext buildFallbackEmail(employee, companyName, userProfile, jobTitle)
+                ?: return@withContext null
 
             parseResponse(content, employee, companyName, userProfile, jobTitle)
         } catch (e: Exception) {
             Log.e(TAG, "Generation failed: ${e.message}", e)
-            buildFallbackEmail(employee, companyName, userProfile, jobTitle)
+            null
         }
     }
 
     private fun buildPrompt(
         employee: Employee,
         companyName: String,
-        profile: UserProfile?,
+        profile: UserProfile,
         jobTitle: String?,
         config: ReferralEmailConfig
     ): String {
-        val hasProfile = profile != null &&
-            (profile.fullName.isNotBlank() || profile.skills.isNotEmpty() || profile.experience.isNotEmpty())
-
         val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
         val employeeRole = employee.jobTitle ?: "employee"
-        val senderFirstName = profile?.fullName?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+        val senderFirstName = profile.fullName.split(" ").firstOrNull()?.takeIf { it.isNotBlank() }
             ?: "[Your first name]"
         val targetLength = config.maxBodyLength.coerceIn(90, 180)
         val minLength = (targetLength - 30).coerceAtLeast(75)
         val maxLength = (targetLength + 10).coerceAtMost(180)
 
-        val candidateSection = if (hasProfile) {
+        val candidateSection = run {
             val name = profile.fullName.ifBlank { "the applicant" }
             val skills = (profile.skills + profile.techStack)
                 .distinct()
@@ -155,8 +152,6 @@ KNOWN FACTS ABOUT THE CANDIDATE:
 - Project Highlight: $projectHighlight
 - Bio / Focus: $bio
             """.trimIndent()
-        } else {
-            "KNOWN FACTS ABOUT THE CANDIDATE: Limited profile data. Write in first person and keep claims conservative."
         }
 
         val formalityGuide = when (config.formalityLevel) {
@@ -167,7 +162,7 @@ KNOWN FACTS ABOUT THE CANDIDATE:
 
         return """
 TASK:
-Write a cold referral request email to a real employee. The email should feel credible, specific, and easy to answer.
+Write a cold intro email to a real employee. The email should feel credible, specific, and easy to answer.
 
 STRICT RULES:
 1. Use ONLY details explicitly given below. Do not invent shared background, achievements, metrics, or personal context.
@@ -176,7 +171,8 @@ STRICT RULES:
 4. Greeting must start with: "Hi $firstName,"
 5. Opening must acknowledge their role or company and immediately state why the sender is writing.
 6. Body must include exactly ONE concrete candidate detail that is actually supported by the profile.
-7. Ask for one low-friction next step: brief advice, a short chat, or consideration for a referral.
+6b. Personalization is mandatory: mention at least one skill and one experience or project detail from the profile.
+7. Ask for one low-friction next step: brief advice, a short chat, or the best intro path.
 8. Tone: $formalityGuide
 9. Avoid fluff and banned phrases: "I hope this finds you well", "reaching out", "passionate", "excited", "opportunity", "leverage", "synergy", "pick your brain".
 10. No generic praise. No overfamiliarity. No mention of finding their email through a tool or database.
@@ -196,7 +192,7 @@ ${if (employee.city != null) "- Location: ${employee.getFormattedLocation()}" el
 ${if (employee.seniority != null) "- Seniority: ${employee.seniority}" else ""}
 
 TARGET CONTEXT:
-${if (jobTitle != null) "- Specific role of interest: $jobTitle at $companyName" else "- General goal: learn about roles at $companyName and ask for the most reasonable next step"}
+${if (jobTitle != null) "- Specific role of interest: $jobTitle at $companyName" else "- General goal: learn about roles at $companyName and request a practical intro path"}
 
 WRITING OBJECTIVE:
 - The email should sound like a thoughtful candidate who did enough homework to be relevant.
@@ -219,87 +215,104 @@ QUALITY CHECK BEFORE WRITING:
         raw: String,
         employee: Employee,
         companyName: String,
-        profile: UserProfile?,
+        profile: UserProfile,
         jobTitle: String?
-    ): ReferralEmail {
+    ): ReferralEmail? {
         val cleaned = raw
             .replace(Regex("<think>[\\s\\S]*?</think>"), "")
             .replace(Regex("\\[THINKING\\][\\s\\S]*?\\[/THINKING\\]"), "")
             .replace("```", "")
             .trim()
 
-        val subjectRegex = Regex("SUBJECT:\\s*(.+)", RegexOption.IGNORE_CASE)
-        val bodyRegex = Regex("BODY:\\s*([\\s\\S]+)", RegexOption.IGNORE_CASE)
+        val (parsedSubject, parsedBody) = extractSubjectAndBody(cleaned)
+        val body = parsedBody?.trim().takeIf { !it.isNullOrBlank() }
 
-        val subject = subjectRegex.find(cleaned)?.groupValues?.get(1)?.trim()
-        val body = bodyRegex.find(cleaned)?.groupValues?.get(1)?.trim()
+        if (body == null) {
+            Log.w(TAG, "Groq response could not be parsed into email body")
+            return null
+        }
+
+        val subject = parsedSubject?.trim().takeUnless { it.isNullOrBlank() }
+            ?: deriveSubjectFromBody(body, jobTitle ?: companyName)
 
         return ReferralEmail(
-            fromName = profile?.fullName ?: "",
-            fromEmail = profile?.email ?: "",
+            fromName = profile.fullName,
+            fromEmail = profile.email,
             toName = employee.fullName,
             toEmail = employee.email,
-            subject = subject ?: buildFallbackSubject(companyName, jobTitle),
-            body = body ?: buildFallbackBody(employee, companyName, profile, jobTitle),
+            subject = subject,
+            body = body,
             companyName = companyName,
             jobTitle = jobTitle
         )
     }
 
-    private fun buildFallbackEmail(
-        employee: Employee,
-        companyName: String,
-        profile: UserProfile?,
-        jobTitle: String?
-    ): ReferralEmail {
-        return ReferralEmail(
-            fromName = profile?.fullName ?: "",
-            fromEmail = profile?.email ?: "",
-            toName = employee.fullName,
-            toEmail = employee.email,
-            subject = buildFallbackSubject(companyName, jobTitle),
-            body = buildFallbackBody(employee, companyName, profile, jobTitle),
-            companyName = companyName,
-            jobTitle = jobTitle
-        )
-    }
+    private fun extractSubjectAndBody(text: String): Pair<String?, String?> {
+        val labeledSubject = Regex("(?im)^subject\\s*[:\\-]\\s*(.+)$")
+            .find(text)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
+        val labeledBody = Regex("(?is)\\bbody\\s*[:\\-]\\s*(.+)$")
+            .find(text)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
 
-    private fun buildFallbackSubject(companyName: String, jobTitle: String?): String {
-        return if (jobTitle != null) {
-            "Quick question about $jobTitle"
-        } else {
-            "Quick question about $companyName"
-        }
-    }
-
-    private fun buildFallbackBody(
-        employee: Employee,
-        companyName: String,
-        profile: UserProfile?,
-        jobTitle: String?
-    ): String {
-        val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
-        val senderName = profile?.fullName?.split(" ")?.firstOrNull() ?: ""
-        val role = jobTitle ?: "roles"
-
-        val skillMention = if (profile != null && profile.skills.isNotEmpty()) {
-            val topSkills = profile.skills.take(2).joinToString(" and ")
-            "My background is in $topSkills, and"
-        } else {
-            "I've been working in the industry, and"
+        if (!labeledBody.isNullOrBlank()) {
+            return labeledSubject to labeledBody
         }
 
-        return """
-Hi $firstName,
+        val jsonObjectText = extractJsonObject(text)
+        if (jsonObjectText != null) {
+            runCatching {
+                val json = JSONObject(jsonObjectText)
+                val jsonSubject = json.optString("subject")
+                    .ifBlank { json.optString("SUBJECT") }
+                    .ifBlank { null }
+                val jsonBody = json.optString("body")
+                    .ifBlank { json.optString("BODY") }
+                    .ifBlank { json.optString("message") }
+                    .ifBlank { null }
 
-I noticed your work at $companyName and wanted to reach out directly. $skillMention I'm very interested in the $role you have open.
+                if (!jsonBody.isNullOrBlank()) {
+                    return jsonSubject to jsonBody
+                }
+            }
+        }
 
-Would you be open to a brief chat about your experience there, or if you're comfortable, considering a referral?
+        // Fallback: treat plain model output as the message body.
+        return null to text
+    }
 
-Totally understand if you're busy - either way, thanks for your time.
+    private fun extractJsonObject(text: String): String? {
+        val start = text.indexOf('{')
+        val end = text.lastIndexOf('}')
+        if (start == -1 || end == -1 || end <= start) return null
+        return text.substring(start, end + 1)
+    }
 
-Best,
-$senderName
-        """.trimIndent()
+    private fun deriveSubjectFromBody(body: String, fallbackHint: String): String {
+        val firstMeaningfulLine = body
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { line ->
+                line.isNotBlank() &&
+                    !line.startsWith("hi ", ignoreCase = true) &&
+                    !line.startsWith("hello", ignoreCase = true)
+            }
+            ?: body
+
+        val words = firstMeaningfulLine
+            .replace(Regex("[^A-Za-z0-9 ]"), " ")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+
+        val dynamic = words.take(6).joinToString(" ").trim()
+        return if (dynamic.isNotBlank()) {
+            dynamic.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        } else {
+            "Quick intro about $fallbackHint"
+        }
     }
 }

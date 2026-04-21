@@ -724,13 +724,6 @@ private fun EmployeeSwipeOverlay(
                                 tint = AccentGreen.copy(alpha = overlayAlpha),
                                 modifier = Modifier.size(22.dp)
                             )
-                            Text(
-                                text = "SAVE",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AccentGreen.copy(alpha = overlayAlpha),
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.5.sp
-                            )
                         }
                     }
                 }
@@ -744,14 +737,7 @@ private fun EmployeeSwipeOverlay(
                         ),
                         modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
                     ) {
-                        Text(
-                            text = "SKIP",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha),
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 2.sp,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                        )
+                        Box(modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp))
                     }
                 }
                 SwipeDirection.NONE -> { }

@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.swipeapply.app.data.model.Employee
+import com.swipeapply.app.ui.components.GroqConsentScreen
 import com.swipeapply.app.ui.components.ShimmerEmailCard
 import com.swipeapply.app.ui.theme.AccentGreen
 import com.swipeapply.app.ui.theme.GradientEnd
@@ -105,10 +106,10 @@ private val ComposerCyan = Color(0xFF06B6D4)
 private val SuccessGreen = Color(0xFF10B981)
 
 /**
- * Professional Cold Referral Email Composer Screen.
+ * Professional Cold Intro Email Composer Screen.
  * 
  * Features:
- * - AI-generated personalized referral template
+ * - AI-generated personalized intro template
  * - Editable From, To, Subject, and Body fields
  * - Direct "Open in Gmail" integration
  * - Copy to clipboard option
@@ -130,7 +131,7 @@ fun ReferralEmailComposerScreen(
     val viewModel: ReferralEmailViewModel = viewModel(factory = ViewModelFactory(application))
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
-    val showEmailSkeleton = uiState.subject.isBlank() && uiState.body.isBlank() && uiState.toEmail.isBlank()
+    val showEmailSkeleton = uiState.isGenerating && uiState.subject.isBlank() && uiState.body.isBlank()
 
     var isCopied by remember { mutableStateOf(false) }
 
@@ -156,7 +157,7 @@ fun ReferralEmailComposerScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Compose Referral",
+                            text = "Compose Intro",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -206,7 +207,7 @@ fun ReferralEmailComposerScreen(
                             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                             viewModel.regenerate()
                         },
-                        enabled = !uiState.isGenerating
+                        enabled = !uiState.isGenerating && !uiState.requiresGroqConsent
                     ) {
                         if (uiState.isGenerating) {
                             CircularProgressIndicator(
@@ -236,6 +237,23 @@ fun ReferralEmailComposerScreen(
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
         ) {
+            if (uiState.requiresGroqConsent) {
+                GroqConsentScreen(
+                    onAllow = {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        viewModel.grantGroqConsent()
+                    },
+                    onDecline = {
+                        viewModel.declineGroqConsent()
+                        onBack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+                return@Column
+            }
+
             // Recipient Context Card
             RecipientContextCard(
                 employee = employee,
@@ -311,10 +329,11 @@ fun ReferralEmailComposerScreen(
 
             // Helper text
             Text(
-                text = if (uiState.aiGenerated) 
-                    "✨ Personalized using your profile. Edit freely before sending."
-                else 
-                    "Edit the template above, then send via your email app.",
+                text = when {
+                    uiState.aiGenerated -> "✨ Groq-personalized from your profile. Edit freely before sending."
+                    uiState.isGenerating -> "Generating draft with Groq..."
+                    else -> "No draft yet. Tap regenerate to request a Groq template."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
@@ -762,7 +781,7 @@ private fun ActionButtonsRow(
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
-                        text = "Send Referral",
+                        text = "Send Intro",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (isValid) Color.White 

@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.ai.IntroTemplateGenerator
+import com.swipeapply.app.data.manager.GroqConsentManager
 import com.swipeapply.app.data.model.EducationItem
 import com.swipeapply.app.data.model.ExperienceItem
 import com.swipeapply.app.data.model.JobCard
@@ -34,13 +35,14 @@ data class IntroTemplateUiState(
     val isCopied: Boolean = false,
     val isGenerating: Boolean = false,
     val generationError: String? = null,
-    val aiGenerated: Boolean = false
+    val aiGenerated: Boolean = false,
+    val requiresGroqConsent: Boolean = false
 )
 
 /**
  * ViewModel for the Intro Template screen.
  * Fetches the user profile, then generates a personalised email via AI.
- * Falls back to the static template if AI is unavailable.
+ * Uses Groq output only (no static template prefill).
  */
 class IntroTemplateViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -52,6 +54,7 @@ class IntroTemplateViewModel(application: Application) : AndroidViewModel(applic
         isLenient = true
         coerceInputValues = true
     }
+    private val consentManager = GroqConsentManager.getInstance(application)
 
     private var currentJobCard: JobCard? = null
     private var cachedProfile: UserProfile? = null
@@ -60,18 +63,36 @@ class IntroTemplateViewModel(application: Application) : AndroidViewModel(applic
     // ─── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Call once when the screen opens. Installs the static template immediately,
-     * then replaces it with an AI-personalised draft.
+     * Call once when the screen opens.
+     * Clears any previous draft and requests a fresh Groq-generated template.
      */
     fun initializeAndGenerate(jobCard: JobCard) {
         currentJobCard = jobCard
+
+        if (!consentManager.hasOutreachConsent()) {
+            _uiState.update {
+                it.copy(
+                    subject = "",
+                    body = "",
+                    isCopied = false,
+                    isGenerating = false,
+                    aiGenerated = false,
+                    generationError = null,
+                    requiresGroqConsent = true
+                )
+            }
+            return
+        }
+
         _uiState.update {
             it.copy(
-                subject = jobCard.introTemplate.subject,
-                body = jobCard.introTemplate.body,
+                subject = "",
+                body = "",
                 isCopied = false,
+                isGenerating = true,
                 aiGenerated = false,
-                generationError = null
+                generationError = null,
+                requiresGroqConsent = false
             )
         }
         viewModelScope.launch { fetchProfileThenGenerate(jobCard) }
@@ -79,8 +100,44 @@ class IntroTemplateViewModel(application: Application) : AndroidViewModel(applic
 
     /** Re-generate a fresh AI draft. */
     fun regenerate() {
+        if (!consentManager.hasOutreachConsent()) {
+            _uiState.update {
+                it.copy(
+                    requiresGroqConsent = true,
+                    isGenerating = false,
+                    generationError = "Consent is required to generate with Groq."
+                )
+            }
+            return
+        }
+
         val job = currentJobCard ?: return
         viewModelScope.launch { generate(job, cachedProfile) }
+    }
+
+    fun grantGroqConsent() {
+        consentManager.grantOutreachConsent()
+        _uiState.update {
+            it.copy(
+                requiresGroqConsent = false,
+                generationError = null,
+                isGenerating = true
+            )
+        }
+
+        currentJobCard?.let { job ->
+            viewModelScope.launch { fetchProfileThenGenerate(job) }
+        }
+    }
+
+    fun declineGroqConsent() {
+        _uiState.update {
+            it.copy(
+                requiresGroqConsent = true,
+                isGenerating = false,
+                generationError = "Consent is required before sharing profile data with Groq."
+            )
+        }
     }
 
     fun updateSubject(subject: String) {
@@ -115,8 +172,20 @@ class IntroTemplateViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private suspend fun generate(job: JobCard, profile: UserProfile?) {
+        if (!hasPersonalizationProfile(profile)) {
+            _uiState.update {
+                it.copy(
+                    isGenerating = false,
+                    aiGenerated = false,
+                    generationError = "Add your parsed resume details in Profile to generate a personalized outreach email."
+                )
+            }
+            return
+        }
+        val personalizationProfile = profile ?: return
+
         _uiState.update { it.copy(isGenerating = true, generationError = null) }
-        val result = IntroTemplateGenerator.generate(job, profile)
+        val result = IntroTemplateGenerator.generate(job, personalizationProfile)
         if (result != null) {
             Log.d(TAG, "AI template ready for ${job.id}")
             _uiState.update {
@@ -130,11 +199,20 @@ class IntroTemplateViewModel(application: Application) : AndroidViewModel(applic
                 )
             }
         } else {
-            Log.w(TAG, "AI generation failed — keeping static template")
+            Log.w(TAG, "Groq generation failed")
             _uiState.update {
-                it.copy(isGenerating = false, generationError = "AI unavailable — edit the template below.")
+                it.copy(isGenerating = false, generationError = "Groq could not generate a template. Check API key/network and retry.")
             }
         }
+    }
+
+    private fun hasPersonalizationProfile(profile: UserProfile?): Boolean {
+        if (profile == null) return false
+        return profile.skills.isNotEmpty() ||
+            profile.techStack.isNotEmpty() ||
+            profile.experience.isNotEmpty() ||
+            profile.projects.isNotEmpty() ||
+            profile.bio.isNotBlank()
     }
 
     private suspend fun fetchProfile(): UserProfile? = withContext(Dispatchers.IO) {
