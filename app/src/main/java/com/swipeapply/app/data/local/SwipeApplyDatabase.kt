@@ -17,10 +17,11 @@ import com.swipeapply.app.data.local.entity.SwipedJobEntity
  * - v1: Initial schema
  * - v2: Added SwipedJobEntity
  * - v3: Added userId to SwipedJobEntity (user-specific swipe tracking)
+ * - v4: Added database indices on swiped_jobs for query performance
  */
 @Database(
     entities = [JobEntity::class, SwipedJobEntity::class], 
-    version = 3, 
+    version = 4, 
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -1,8 +1,8 @@
 package com.swipeapply.app.ui.components.swipe
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -73,15 +73,19 @@ fun JobSwipeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderColor by animateColorAsState(
+    val borderColor = BrandBorder
+
+    val activeBorderColor by animateColorAsState(
         targetValue = when (swipeDirection) {
-            SwipeDirection.RIGHT -> BrandPrimary.copy(alpha = swipeProgress * 0.9f)
-            SwipeDirection.LEFT -> MaterialTheme.colorScheme.error.copy(alpha = swipeProgress * 0.9f)
-            SwipeDirection.NONE -> BrandBorder
+            SwipeDirection.RIGHT -> Color(0xFF00D26A).copy(alpha = swipeProgress * 0.8f)
+            SwipeDirection.LEFT -> Color(0xFFFF6B6B).copy(alpha = swipeProgress * 0.8f)
+            SwipeDirection.NONE -> borderColor
         },
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 500f),
-        label = "borderColor"
+        label = "jobBorderColor"
     )
+
+    val cardBg = MaterialTheme.colorScheme.surface
 
     Surface(
         modifier = modifier
@@ -92,9 +96,9 @@ fun JobSwipeCard(
                 indication = null
             ) { onClick() },
         shape = RoundedCornerShape(32.dp),
-        color = Color.White,
+        color = cardBg,
         shadowElevation = 8.dp,
-        border = BorderStroke(if (swipeProgress > 0.05f) 2.dp else 1.dp, borderColor)
+        border = BorderStroke(if (swipeProgress > 0.05f) 3.dp else 1.dp, if (swipeProgress > 0.05f) activeBorderColor else borderColor)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -142,7 +146,7 @@ fun JobSwipeCard(
                             Text(
                                 text = jobCard.roleDescription.cleanHtml(),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = BrandForeground.copy(alpha = 0.9f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                                 lineHeight = 24.sp
                             )
                         }
@@ -156,15 +160,14 @@ fun JobSwipeCard(
                             .height(100.dp)
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.White, Color.White)
+                                    colors = listOf(Color.Transparent, cardBg, cardBg)
                                 )
                             )
                     )
                 }
             }
 
-            // Swipe Overlay
-            SwipeOverlay(swipeDirection, swipeProgress)
+
         }
     }
 }
@@ -378,43 +381,4 @@ fun String.cleanHtml(): String {
         .replace("&lt;", "<").replace("&gt;", ">").trim()
 }
 
-@Composable
-private fun SwipeOverlay(direction: SwipeDirection, progress: Float) {
-    if (progress > 0.05f) {
-        val overlayAlpha = (progress * 0.95f).coerceAtMost(1f)
-        val scale by animateFloatAsState(targetValue = 0.9f + (progress * 0.1f), animationSpec = spring(dampingRatio = 0.7f), label = "")
 
-        Box(
-            modifier = Modifier.fillMaxSize().padding(28.dp),
-            contentAlignment = when (direction) {
-                SwipeDirection.RIGHT -> Alignment.TopStart // Like tinder, show LIKE on left when swiping right
-                SwipeDirection.LEFT -> Alignment.TopEnd
-                SwipeDirection.NONE -> Alignment.Center
-            }
-        ) {
-            when (direction) {
-                SwipeDirection.RIGHT -> {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(4.dp, BrandPrimary.copy(alpha = overlayAlpha)),
-                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = -15f }
-                    ) {
-                        Box(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp))
-                    }
-                }
-                SwipeDirection.LEFT -> {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(4.dp, MaterialTheme.colorScheme.error.copy(alpha = overlayAlpha)),
-                        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = 15f }
-                    ) {
-                        Box(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp))
-                    }
-                }
-                SwipeDirection.NONE -> { }
-            }
-        }
-    }
-}

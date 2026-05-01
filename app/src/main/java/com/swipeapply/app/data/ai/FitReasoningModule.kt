@@ -127,7 +127,7 @@ class FitReasoningModule {
             |
             |Title: ${job.title}
             |Company: ${job.company.name}
-            |Location: ${job.location} (${job.locationType.label})
+            |Location: ${job.location}
             |Tech Stack Required: ${job.techStack.joinToString(", ")}
             |
             |## INPUT: PRECOMPUTED MATCH BREAKDOWN (From Ranking Engine)

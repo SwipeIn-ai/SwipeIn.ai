@@ -15,7 +15,7 @@ object EmployeeApiClient {
     private const val BASE_URL = "http://144.24.154.69:8080/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.BASIC
     }
 
     private val okHttpClient = OkHttpClient.Builder()

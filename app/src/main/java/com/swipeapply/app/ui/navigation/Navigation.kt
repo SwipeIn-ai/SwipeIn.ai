@@ -1,5 +1,6 @@
 package com.swipeapply.app.ui.navigation
 
+import android.util.Log
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -29,15 +30,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.config.ApiConfig
-import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.repository.JobRepository
 import com.swipeapply.app.ui.screens.EmployeeFinderScreen
 import com.swipeapply.app.ui.screens.HomeScreen
-import com.swipeapply.app.ui.screens.IntroTemplateScreen
 import com.swipeapply.app.ui.screens.MainScaffold
 import com.swipeapply.app.ui.screens.OnboardingScreen
+import com.swipeapply.app.ui.screens.PrivacyPolicyScreen
 import com.swipeapply.app.ui.screens.ProfileCreationScreen
 import com.swipeapply.app.ui.screens.ProfileScreen
+import com.swipeapply.app.ui.screens.TermsScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
@@ -48,9 +49,8 @@ sealed class Screen(val route: String) {
     object ProfileCreation : Screen("profile_creation")
     object Home : Screen("home")
     object Profile : Screen("profile")
-    object IntroTemplate : Screen("intro_template/{jobId}") {
-        fun createRoute(jobId: String) = "intro_template/$jobId"
-    }
+    object PrivacyPolicy : Screen("privacy_policy")
+    object Terms : Screen("terms")
     object EmployeeFinder : Screen("employee_finder/{companyName}") {
         fun createRoute(companyName: String): String {
             val encoded = URLEncoder.encode(companyName, "UTF-8")
@@ -71,13 +71,22 @@ fun SwipeApplyNavHost(
     LaunchedEffect(context) {
         resolvedStartDestination = try {
             SupabaseClient.client.auth.awaitInitialization()
-            val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+            val userId = SupabaseClient.getCurrentUserId()
             when {
                 userId == null -> Screen.Onboarding.route
-                JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY).hasUserProfile(userId) -> Screen.Home.route
-                else -> Screen.ProfileCreation.route
+                else -> {
+                    // If profile check fails (e.g. table doesn't exist), go to ProfileCreation
+                    val hasProfile = try {
+                        JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY).hasUserProfile(userId)
+                    } catch (e: Exception) {
+                        Log.e("Navigation", "Profile check failed, defaulting to ProfileCreation", e)
+                        false
+                    }
+                    if (hasProfile) Screen.Home.route else Screen.ProfileCreation.route
+                }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("Navigation", "Auth init failed", e)
             Screen.Onboarding.route
         }
     }
@@ -149,24 +158,32 @@ fun SwipeApplyNavHost(
 
                     scope.launch {
                         try {
-                            val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+                            // Get user ID: prefer currentUser, fallback to decoding JWT
+                            val userId = SupabaseClient.getCurrentUserId()
+
                             if (userId != null) {
-                                val repository = JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY)
-                                val hasProfile = repository.hasUserProfile(userId)
+                                val hasProfile = try {
+                                    JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY)
+                                        .hasUserProfile(userId)
+                                } catch (_: Exception) { false }
 
                                 if (hasProfile) {
                                     navController.navigate(Screen.Home.route) {
-                                        popUpTo(0) { inclusive = true }
+                                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                                        launchSingleTop = true
                                     }
                                 } else {
                                     navController.navigate(Screen.ProfileCreation.route) {
-                                        popUpTo(0) { inclusive = true }
+                                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                                        launchSingleTop = true
                                     }
                                 }
                             } else {
+                                Log.e("Navigation", "Failed to get user ID after authentication retries")
                                 isNavigating = false
                             }
                         } catch (e: Exception) {
+                            Log.e("Navigation", "Error in onContinue", e)
                             isNavigating = false
                         }
                     }
@@ -175,8 +192,15 @@ fun SwipeApplyNavHost(
                     if (isNavigating) return@OnboardingScreen
                     isNavigating = true
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        launchSingleTop = true
                     }
+                },
+                onNavigateToPrivacyPolicy = {
+                    navController.navigate(Screen.PrivacyPolicy.route)
+                },
+                onNavigateToTerms = {
+                    navController.navigate(Screen.Terms.route)
                 }
             )
         }
@@ -187,7 +211,8 @@ fun SwipeApplyNavHost(
             ProfileCreationScreen(
                 onNavigateHome = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(Screen.ProfileCreation.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -200,9 +225,6 @@ fun SwipeApplyNavHost(
                 selectedTabIndex = selectedTabIndex,
                 onTabSelected = { selectedTabIndex = it },
                 onCardClicked = { },
-                onRequestIntro = { jobCard ->
-                    navController.navigate(Screen.IntroTemplate.createRoute(jobCard.id))
-                },
                 onNavigateToEmployeeFinder = { companyName ->
                     navController.navigate(Screen.EmployeeFinder.createRoute(companyName))
                 },
@@ -210,6 +232,12 @@ fun SwipeApplyNavHost(
                 isDarkModeEnabled = isDarkModeEnabled,
                 onNavigateToProfile = {
                     navController.navigate(Screen.Profile.route)
+                },
+                onNavigateToPrivacyPolicy = {
+                    navController.navigate(Screen.PrivacyPolicy.route)
+                },
+                onNavigateToTerms = {
+                    navController.navigate(Screen.Terms.route)
                 },
                 onSignOutSuccess = {
                     navController.navigate(Screen.Onboarding.route) {
@@ -229,28 +257,14 @@ fun SwipeApplyNavHost(
             )
         }
 
-        composable(
-            route = Screen.IntroTemplate.route,
-            arguments = listOf(
-                navArgument("jobId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val context = LocalContext.current
-            val jobId = backStackEntry.arguments?.getString("jobId") ?: return@composable
+        // IntroTemplate route removed — intro flow is now inside EmployeeFinder
 
-            val repository = JobRepository.getInstance(context, ApiConfig.FINDWORK_API_KEY)
-            var jobCard by remember { mutableStateOf<JobCard?>(null) }
+        composable(route = Screen.PrivacyPolicy.route) {
+            PrivacyPolicyScreen(onBack = { navController.popBackStack() })
+        }
 
-            LaunchedEffect(jobId) {
-                jobCard = repository.getJobCardById(jobId)
-            }
-
-            jobCard?.let { card ->
-                IntroTemplateScreen(
-                    jobCard = card,
-                    onBack = { navController.popBackStack() }
-                )
-            }
+        composable(route = Screen.Terms.route) {
+            TermsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

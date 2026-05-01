@@ -12,7 +12,6 @@ import com.swipeapply.app.data.model.UserProfile
 import com.swipeapply.app.data.repository.JobRepository
 import com.swipeapply.app.utils.ResumeParser
 import com.swipeapply.app.utils.ResumeParserV2
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -45,12 +44,12 @@ class ProfileCreationViewModel(
             _uiState.update { it.copy(isLoading = true, error = null, parseProgress = 0f, parseStage = "") }
 
             _uiState.update {
-                it.copy(parseProgress = 0.1f, parseStage = "Analyzing resume with Groq...")
+                it.copy(parseProgress = 0.1f, parseStage = "Analyzing your resume...")
             }
 
             val result = ResumeParser.parseResume(context, uri) ?: run {
                 _uiState.update {
-                    it.copy(parseProgress = 0.2f, parseStage = "Groq unavailable, using local parser...")
+                    it.copy(parseProgress = 0.2f, parseStage = "Using alternative parser...")
                 }
 
                 ResumeParserV2.parseResume(
@@ -74,7 +73,7 @@ class ProfileCreationViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Could not parse resume with Groq or local parser. Please fill manually.",
+                        error = "Could not parse your resume automatically. Please fill in your details manually.",
                         profile = UserProfile(),
                         parseProgress = 0f,
                         parseStage = ""
@@ -84,7 +83,7 @@ class ProfileCreationViewModel(
         }
     }
 
-    fun updateProfileField(newProfile: UserProfile) {
+    fun updateProfileField(newProfile: UserProfile?) {
         _uiState.update { it.copy(profile = newProfile, error = null) }
     }
 
@@ -102,14 +101,15 @@ class ProfileCreationViewModel(
                 return@launch
             }
 
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(error = null) }
 
             try {
-                val userId = SupabaseClient.client.auth.currentUserOrNull()?.id
+                // Get user ID reliably (with JWT fallback)
+                val userId = SupabaseClient.getCurrentUserId()
 
                 if (userId == null) {
                     _uiState.update {
-                        it.copy(isLoading = false, error = "User not logged in")
+                        it.copy(error = "Not logged in. Please restart the app and sign in again.")
                     }
                     return@launch
                 }
@@ -118,13 +118,12 @@ class ProfileCreationViewModel(
 
                 if (result.isSuccess) {
                     _uiState.update {
-                        it.copy(isLoading = false, isSaved = true)
+                        it.copy(isSaved = true)
                     }
                 } else {
                     _uiState.update {
                         it.copy(
-                            isLoading = false,
-                            error = "Failed to save profile"
+                            error = result.exceptionOrNull()?.message ?: "Failed to save profile"
                         )
                     }
                 }
@@ -134,7 +133,6 @@ class ProfileCreationViewModel(
 
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
                         error = e.message ?: "Unknown error"
                     )
                 }

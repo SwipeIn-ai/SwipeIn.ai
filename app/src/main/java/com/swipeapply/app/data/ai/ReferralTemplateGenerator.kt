@@ -1,7 +1,6 @@
 package com.swipeapply.app.data.ai
 
 import android.util.Log
-import com.swipeapply.app.BuildConfig
 import com.swipeapply.app.data.model.Employee
 import com.swipeapply.app.data.model.FormalityLevel
 import com.swipeapply.app.data.model.ReferralEmail
@@ -9,13 +8,7 @@ import com.swipeapply.app.data.model.ReferralEmailConfig
 import com.swipeapply.app.data.model.UserProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * AI-powered cold referral email generator.
@@ -25,21 +18,11 @@ import java.util.concurrent.TimeUnit
  * - Target employee's details (name, role, company)
  * - Optional job context
  *
- * Uses Groq API with Llama 3.1 8B Instant for real-time generation.
+ * Uses Groq API via GroqApiClient with retry, rate-limit, and timeout handling.
  */
 object ReferralTemplateGenerator {
 
     private const val TAG = "ReferralTemplateGen"
-    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-    private const val MODEL = "llama-3.1-8b-instant"
-
-    private val httpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(90, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-    }
 
     suspend fun generate(
         employee: Employee,
@@ -48,55 +31,22 @@ object ReferralTemplateGenerator {
         jobTitle: String? = null,
         config: ReferralEmailConfig = ReferralEmailConfig()
     ): ReferralEmail? = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GROQ_API_KEY
-        if (apiKey.isBlank()) {
-            Log.e(TAG, "Groq API key not configured")
-            return@withContext null
-        }
-
         val prompt = buildPrompt(employee, companyName, userProfile, jobTitle, config)
 
-        val requestBody = JSONObject().apply {
-            put("model", MODEL)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", prompt)
-                })
-            })
-            put("temperature", 0.2)
-            put("max_tokens", 600)
-        }
+        val result = GroqApiClient.complete(
+            prompt = prompt,
+            temperature = 0.2,
+            maxTokens = 600
+        )
 
-        val request = Request.Builder()
-            .url(GROQ_URL)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Content-Type", "application/json")
-            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-
-        return@withContext try {
-            val response = httpClient.newCall(request).execute()
-            val body = response.body.string()
-
-            if (!response.isSuccessful) {
-                Log.e(TAG, "Groq error ${response.code}: $body")
-                return@withContext null
+        when (result) {
+            is GroqApiClient.GroqResult.Success -> {
+                parseResponse(result.content, employee, companyName, userProfile, jobTitle)
             }
-
-            val message = JSONObject(body)
-                .optJSONArray("choices")
-                ?.getJSONObject(0)
-                ?.optJSONObject("message")
-
-            val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
-                ?: return@withContext null
-
-            parseResponse(content, employee, companyName, userProfile, jobTitle)
-        } catch (e: Exception) {
-            Log.e(TAG, "Generation failed: ${e.message}", e)
-            null
+            is GroqApiClient.GroqResult.Error -> {
+                Log.e(TAG, "Generation failed: ${result.message}")
+                null
+            }
         }
     }
 

@@ -79,8 +79,9 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         val client = OkHttpClient.Builder()
             .addInterceptor(logging)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .connectionPool(okhttp3.ConnectionPool(5, 5, TimeUnit.MINUTES))
             .build()
 
         Retrofit.Builder()
@@ -94,6 +95,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     // --- QUEUE SYSTEM ---
     private val jobQueue = ArrayDeque<JobCard>()
     private val queuedJobIds = HashSet<String>()
+    private val maxQueueSize = 100 // Prevent unbounded memory growth
     
     private var currentPage = 1
     private var hasMorePages = true
@@ -190,7 +192,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         val swipedIds = jobDao.getSwipedJobIdsByUser(currentUserId).toSet()
 
         try {
-            while (hasMorePages && jobQueue.size < 20) {
+            while (hasMorePages && jobQueue.size < maxQueueSize) {
                 Log.d(TAG, "Fetching Page $currentPage...")
                 val response = apiService.getJobs(
                     authToken = authToken,
@@ -367,7 +369,9 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     }
     
     /**
-     * Check if user profile exists in database
+     * Check if user has a COMPLETE profile (went through ProfileCreation flow).
+     * A Supabase auth trigger may auto-create a row with full_name from Google,
+     * so we also check that skills are filled in (only happens after resume upload).
      */
     suspend fun hasUserProfile(userId: String): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -383,14 +387,25 @@ class JobRepository(private val context: Context, private val apiKey: String) {
             
             // response.data is a JSON string like "[]" or "[{...}]"
             val data = response.data
-            Log.d(TAG, "Profile query response: $data")
             
-            // Check if the JSON array has any items
-            // "[]" means empty, "[{...}]" means has data
-            val hasProfile = data != "[]" && data.isNotEmpty() && data != "null"
-            Log.d(TAG, "Has profile: $hasProfile")
+            if (data == "[]" || data.isEmpty() || data == "null") {
+                return@withContext false
+            }
             
-            return@withContext hasProfile
+            // Check that the profile was completed via ProfileCreation flow:
+            // full_name must be set AND skills must be non-empty
+            try {
+                val jsonArray = org.json.JSONArray(data)
+                if (jsonArray.length() == 0) return@withContext false
+                val profile = jsonArray.getJSONObject(0)
+                val fullName = profile.optString("full_name", "").trim()
+                val skills = profile.optJSONArray("skills")
+                val hasSkills = skills != null && skills.length() > 0
+                Log.d(TAG, "Profile check: fullName='$fullName', hasSkills=$hasSkills")
+                return@withContext fullName.isNotEmpty() && hasSkills
+            } catch (_: Exception) {
+                return@withContext false
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error checking profile existence", e)
             // On error, assume no profile exists so user can create one

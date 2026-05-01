@@ -1,5 +1,6 @@
 package com.swipeapply.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -88,9 +89,10 @@ fun MainScaffold(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
     onCardClicked: (JobCard) -> Unit,
-    onRequestIntro: (JobCard) -> Unit,
     onNavigateToEmployeeFinder: (String) -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit = {},
+    onNavigateToTerms: () -> Unit = {},
     onSignOutSuccess: () -> Unit,
     onDarkModeToggle: (Boolean?) -> Unit,
     isDarkModeEnabled: Boolean?,
@@ -98,6 +100,11 @@ fun MainScaffold(
 ) {
     val savedCount by SavedContactsRepository.companies.collectAsState()
     val totalSaved = savedCount.sumOf { it.contacts.size }
+
+    // When on a non-default tab, back should go to Jobs tab first
+    BackHandler(enabled = selectedTabIndex != 0) {
+        onTabSelected(0)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -126,11 +133,12 @@ fun MainScaffold(
                     when (tab) {
                         0 -> HomeScreen(
                             onCardClicked = onCardClicked,
-                            onRequestIntro = onRequestIntro,
                             onNavigateToEmployeeFinder = onNavigateToEmployeeFinder,
                             onDarkModeToggle = onDarkModeToggle,
                             isDarkModeEnabled = isDarkModeEnabled,
                             onNavigateToProfile = onNavigateToProfile,
+                            onNavigateToPrivacyPolicy = onNavigateToPrivacyPolicy,
+                            onNavigateToTerms = onNavigateToTerms,
                             onSignOutSuccess = onSignOutSuccess,
                             modifier = Modifier.fillMaxSize()
                         )

@@ -150,7 +150,6 @@ fun EmployeeFinderScreen(
             EmployeeFinderTopBar(
                 companyName = companyName,
                 savedCount = uiState.savedContacts.size,
-                remainingSwipes = uiState.remainingSwipes,
                 onBack = onBack,
                 onViewSaved = { showSavedSheet = true },
                 onUndo = {
@@ -165,28 +164,15 @@ fun EmployeeFinderScreen(
                 enter = fadeIn() + slideInVertically(),
                 exit = fadeOut() + slideOutVertically()
             ) {
-                Column(
+                LinearProgressIndicator(
+                    progress = { uiState.progressFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    LinearProgressIndicator(
-                        progress = { uiState.progressFraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = ReferralCyan,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "${uiState.reviewedCount} of ${uiState.employees.size} contacts reviewed",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = ReferralCyan,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
             }
 
             // Main Content Area
@@ -216,12 +202,34 @@ fun EmployeeFinderScreen(
                         )
                     }
                     uiState.visibleEmployees.isNotEmpty() -> {
-                        EmployeeCardStack(
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Swipe hint for first-time users
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = uiState.reviewedCount == 0,
+                                enter = fadeIn(tween(600)),
+                                exit = fadeOut(tween(400))
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                ) {
+                                    Text(
+                                        text = "← Pass  ·  Connect →",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+
+                            EmployeeCardStack(
                             employees = uiState.visibleEmployees,
                             companyName = companyName,
                             onSaveContact = { employee ->
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 viewModel.saveContact()
+                                emailTargetEmployee = employee
                             },
                             onDismissContact = { employee ->
                                 view.performHapticFeedback(HapticFeedbackConstants.REJECT)
@@ -231,33 +239,37 @@ fun EmployeeFinderScreen(
                                 selectedEmployee = employee
                             }
                         )
+                        }
                     }
                 }
 
-                // Bottom Action Buttons
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = uiState.visibleEmployees.isNotEmpty() && !uiState.allReviewed && !uiState.isLoading,
-                    enter = fadeIn(tween(300)) + slideInVertically(
-                        initialOffsetY = { it / 2 },
-                        animationSpec = spring(dampingRatio = 0.8f)
-                    ),
-                    exit = fadeOut(tween(200)) + slideOutVertically(
-                        targetOffsetY = { it / 2 }
-                    ),
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    EmployeeActionButtons(
-                        onDismiss = {
-                            view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                            viewModel.dismissContact()
-                        },
-                        onSave = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            viewModel.saveContact()
-                        }
-                    )
-                }
             }
+        }
+
+        // Floating action buttons — rendered outside Column so they float over everything
+        androidx.compose.animation.AnimatedVisibility(
+            visible = uiState.visibleEmployees.isNotEmpty() && !uiState.allReviewed && !uiState.isLoading,
+            enter = fadeIn(tween(300)) + slideInVertically(
+                initialOffsetY = { it / 2 },
+                animationSpec = spring(dampingRatio = 0.8f)
+            ),
+            exit = fadeOut(tween(200)) + slideOutVertically(
+                targetOffsetY = { it / 2 }
+            ),
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+        ) {
+            EmployeeActionButtons(
+                onDismiss = {
+                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                    viewModel.dismissContact()
+                },
+                onSave = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    val topEmployee = uiState.visibleEmployees.firstOrNull()
+                    viewModel.saveContact()
+                    if (topEmployee != null) emailTargetEmployee = topEmployee
+                }
+            )
         }
 
         // Employee Detail Bottom Sheet
@@ -341,7 +353,6 @@ fun EmployeeFinderScreen(
 private fun EmployeeFinderTopBar(
     companyName: String,
     savedCount: Int,
-    remainingSwipes: Int,
     onBack: () -> Unit,
     onViewSaved: () -> Unit,
     onUndo: () -> Unit
@@ -373,7 +384,7 @@ private fun EmployeeFinderTopBar(
                 }
                 Column {
                     Text(
-                        text = "Find Emails",
+                        text = "Referral Contacts",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
@@ -445,22 +456,6 @@ private fun EmployeeFinderTopBar(
                         }
                     }
                 }
-
-                // Remaining swipes
-                if (remainingSwipes >= 0) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = ReferralCyan.copy(alpha = 0.1f)
-                    ) {
-                        Text(
-                            text = "🔄 $remainingSwipes",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ReferralCyan,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-                }
             }
         }
     }
@@ -476,8 +471,8 @@ private fun EmployeeActionButtons(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp)
-            .padding(bottom = 24.dp),
+            .padding(horizontal = 64.dp)
+            .padding(bottom = 28.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -485,71 +480,45 @@ private fun EmployeeActionButtons(
         FilledIconButton(
             onClick = onDismiss,
             modifier = Modifier
-                .size(56.dp)
-                .offset(y = (-16).dp)
+                .size(64.dp)
                 .shadow(
                     elevation = 16.dp,
                     shape = CircleShape,
-                    spotColor = Color(0xFF657786).copy(alpha = 0.4f)
+                    spotColor = MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
                 ),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF657786)
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.error
             )
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Dismiss",
-                modifier = Modifier.size(28.dp)
+                contentDescription = "Pass",
+                modifier = Modifier.size(30.dp)
             )
         }
 
-        // Saved (Mock)
-        FilledIconButton(
-            onClick = { },
-            modifier = Modifier
-                .size(48.dp)
-                .offset(y = 8.dp)
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    spotColor = Color(0xFF2196F3).copy(alpha = 0.4f)
-                ),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF2196F3)
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Bookmark,
-                contentDescription = "Saved",
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Save Contact
+        // Connect / Right Swipe
         FilledIconButton(
             onClick = onSave,
             modifier = Modifier
-                .size(56.dp)
-                .offset(y = (-16).dp)
+                .size(64.dp)
                 .shadow(
                     elevation = 16.dp,
                     shape = CircleShape,
-                    spotColor = Color(0xFFFF5252).copy(alpha = 0.4f)
+                    spotColor = Color(0xFFFD297B).copy(alpha = 0.5f)
                 ),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFFFF5252)
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = Color(0xFFFD297B)
             )
         ) {
             Icon(
                 imageVector = Icons.Default.Favorite,
-                contentDescription = "Save Contact",
-                modifier = Modifier.size(28.dp)
+                contentDescription = "Connect",
+                modifier = Modifier.size(30.dp)
             )
         }
     }
@@ -696,7 +665,7 @@ private fun LoadingState() {
 
             // Heading
             Text(
-                text = "Finding Intro Contacts",
+                text = "Finding Employees",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -988,9 +957,14 @@ private fun EmployeeDetailSheet(
     val BrandPrimary = Color(0xFF0A66C2)
     val BrandSecondary = Color(0xFFE8F3FF)
     val BrandForeground = Color(0xFF1A1D21)
-    val BrandMuted = Color(0xFFF8F9FA)
     val BrandMutedForeground = Color(0xFF666E76)
     val BrandBorder = Color(0xFFDEE2E6)
+    val tier = employee.getConfidenceTier()
+    val tierColor = when (tier) {
+        ConfidenceTier.HIGH -> VerifiedGreen
+        ConfidenceTier.MEDIUM -> Color(0xFFF59E0B)
+        ConfidenceTier.LOW -> MaterialTheme.colorScheme.error
+    }
 
     Column(
         modifier = Modifier
@@ -1000,144 +974,181 @@ private fun EmployeeDetailSheet(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Profile Info
+        // ── Avatar ──
         Box(
             modifier = Modifier
-                .offset(y = (-48).dp)
-                .size(96.dp)
-                .background(Brush.linearGradient(listOf(BrandSecondary, Color.White, BrandPrimary.copy(alpha = 0.1f))), CircleShape)
-                .border(6.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                .shadow(2.dp, CircleShape),
+                .size(80.dp)
+                .background(
+                    Brush.linearGradient(listOf(BrandSecondary, BrandPrimary.copy(alpha = 0.15f))),
+                    CircleShape
+                )
+                .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Box(Modifier.fillMaxSize().background(BrandPrimary.copy(alpha = 0.05f)))
             Text(
                 text = employee.getInitials(),
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Black,
                 color = BrandPrimary,
-                letterSpacing = (-1).sp
+                letterSpacing = (-0.5).sp
             )
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.offset(y = (-24).dp)
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = employee.fullName,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = BrandForeground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = employee.jobTitle ?: "Professional",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = BrandMutedForeground,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = BrandSecondary,
+            border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.15f))
         ) {
             Text(
-                text = employee.fullName,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = BrandForeground,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.padding(bottom = 4.dp)
+                text = companyName,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = BrandPrimary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
             )
-            Text(
-                text = employee.jobTitle ?: "Employee",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = BrandMutedForeground
-            )
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(top = 12.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, BrandBorder),
-                    shadowElevation = 1.dp,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(companyName.first().toString().uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Black, color = BrandForeground)
-                    }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(companyName, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
-                Box(modifier = Modifier.padding(horizontal = 8.dp).size(4.dp).background(BrandMutedForeground.copy(alpha = 0.4f), CircleShape))
-                Text("2nd Connection", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = BrandMutedForeground)
-            }
         }
 
-        HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), color = BrandBorder.copy(alpha = 0.6f))
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(color = BrandBorder.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // AI Assistant Section
-        Column(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+        // ── Email Row ──
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = CircleShape, color = BrandSecondary, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Verified, null, tint = BrandPrimary, modifier = Modifier.padding(6.dp)) // Magic stick mock
+                Icon(
+                    imageVector = Icons.Default.Email,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = BrandPrimary
+                )
+                Text(
+                    text = employee.email,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = tierColor.copy(alpha = 0.12f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        if (tier == ConfidenceTier.HIGH) {
+                            Icon(Icons.Default.Verified, null, modifier = Modifier.size(10.dp), tint = tierColor)
+                        }
+                        Text(
+                            text = "${employee.confidence}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tierColor,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Text("AI Intro Assistant", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = BrandForeground)
                 }
-                Surface(shape = RoundedCornerShape(6.dp), color = BrandSecondary.copy(alpha = 0.5f), border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f))) {
-                    Text("DRAFT READY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = BrandPrimary, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                }
-            }
-
-            // Message Box
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = BrandMuted.copy(alpha = 0.4f),
-                border = BorderStroke(1.dp, BrandBorder.copy(alpha = 0.6f)),
-                shadowElevation = 0.dp // shadow-inner in compose is tricky, keeping flat
-            ) {
-                Box(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    val firstName = employee.fullName.split(" ").firstOrNull() ?: "there"
-                    Text(
-                        text = "Hi $firstName,\n\nI noticed you work at $companyName and I am interested in the roles that recently opened up. I would love to connect and learn more about your experience there.\n\nWould you be open to a brief chat or guidance on the best intro path?",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = BrandForeground.copy(alpha = 0.9f),
-                        lineHeight = 22.sp
+                IconButton(
+                    onClick = { onCopyEmail(employee.email) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy email",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Text(
-                text = "Personalized based on your profile and the job description.",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = BrandMutedForeground,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 24.dp)
-            )
         }
 
-        // Action Buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        // ── LinkedIn Row ──
+        if (!employee.linkedinUrl.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
             Surface(
-                onClick = { onSendReferralEmail(employee) },
-                shape = RoundedCornerShape(16.dp),
-                color = BrandSecondary,
-                border = BorderStroke(1.dp, BrandPrimary.copy(alpha = 0.1f)),
-                modifier = Modifier.weight(1f).height(56.dp)
+                shape = RoundedCornerShape(14.dp),
+                color = LinkedInBlue.copy(alpha = 0.06f),
+                border = BorderStroke(1.dp, LinkedInBlue.copy(alpha = 0.15f)),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onOpenLinkedIn(employee.linkedinUrl!!) }
             ) {
-                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Edit, null, tint = BrandPrimary, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = BrandPrimary)
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = LinkedInBlue.copy(alpha = 0.15f),
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("in", style = MaterialTheme.typography.labelMedium, color = LinkedInBlue, fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+                    Text(
+                        text = "View LinkedIn Profile",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LinkedInBlue,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp), tint = LinkedInBlue)
                 }
             }
+        }
 
-            Surface(
-                onClick = { onSendReferralEmail(employee) },
-                shape = RoundedCornerShape(16.dp),
-                color = BrandPrimary,
-                shadowElevation = 8.dp,
-                modifier = Modifier.weight(2f).height(56.dp)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ── Primary CTA ──
+        Surface(
+            onClick = { onSendReferralEmail(employee) },
+            shape = RoundedCornerShape(16.dp),
+            color = BrandPrimary,
+            shadowElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxSize()
             ) {
-                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Email, null, tint = Color.White, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Send Intro", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
+                Icon(Icons.Default.Email, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Compose Intro Email",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
         }
     }

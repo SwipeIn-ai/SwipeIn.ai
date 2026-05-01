@@ -238,8 +238,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 repository.getJobCards(
                     search = searchQuery,
-                    location = ApiConfig.DEFAULT_LOCATION,
-                    remote = ApiConfig.DEFAULT_REMOTE_ONLY
+                    location = ApiConfig.DEFAULT_LOCATION
                 ).collect { result ->
                     result.fold(
                         onSuccess = { cards ->
@@ -343,7 +342,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 repository.getJobCards(
                     search = searchQuery,
                     location = ApiConfig.DEFAULT_LOCATION,
-                    remote = ApiConfig.DEFAULT_REMOTE_ONLY,
                     forceRefresh = true
                 ).collect { result ->
                     result.fold(
@@ -373,7 +371,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val nextJob = repository.getNextJobFromQueue(
                 search = searchQuery,
                 location = ApiConfig.DEFAULT_LOCATION,
-                remote = ApiConfig.DEFAULT_REMOTE_ONLY
+                remote = null
             )
 
             _uiState.update { state ->
@@ -393,13 +391,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     applicationStatus = if (direction == SwipeDirection.RIGHT) ApplicationStatus.SAVED else null
                 )
 
+                // Cap undo history at 50 to prevent unbounded memory growth
+                val newUndoHistory = (state.undoHistory + undoableAction).takeLast(50)
+
                 state.copy(
                     cards = currentList,
                     isEmpty = currentList.isEmpty() && nextJob == null,
                     interestedCards = if (direction == SwipeDirection.RIGHT) state.interestedCards + card else state.interestedCards,
                     skippedCards = if (direction == SwipeDirection.LEFT) state.skippedCards + card else state.skippedCards,
                     swipeHistory = listOf(historyEntry) + state.swipeHistory.filterNot { it.card.id == card.id },
-                    undoHistory = state.undoHistory + undoableAction,
+                    undoHistory = newUndoHistory,
                     canUndo = true,
                     currentStreak = newStreak,
                     todaySwipeCount = newTodayCount

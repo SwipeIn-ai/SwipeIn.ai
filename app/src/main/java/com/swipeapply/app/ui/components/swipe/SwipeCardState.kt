@@ -31,9 +31,9 @@ class SwipeCardState(
     var detectedDirection by mutableStateOf(SwipeDirection.NONE)
         private set
 
-    private val swipeThreshold = screenWidth * 0.35f
-    private val maxRotation = 12f
-    private val velocityMultiplier = 0.15f
+    private val swipeThreshold = screenWidth * 0.30f
+    private val maxRotation = 15f
+    private val velocityMultiplier = 0.20f
 
     var isDragging by mutableStateOf(false)
         private set
@@ -80,8 +80,8 @@ class SwipeCardState(
         offset.animateTo(
             targetValue = Offset(targetX, offset.value.y * 0.5f),
             animationSpec = spring(
-                dampingRatio = 0.75f,
-                stiffness = 200f
+                dampingRatio = 0.7f,
+                stiffness = 300f
             )
         )
         onSwipe(direction)
@@ -92,8 +92,8 @@ class SwipeCardState(
         offset.animateTo(
             targetValue = Offset.Zero,
             animationSpec = spring(
-                dampingRatio = 0.6f,
-                stiffness = 500f
+                dampingRatio = 0.55f,
+                stiffness = 600f
             )
         )
         rotation = 0f

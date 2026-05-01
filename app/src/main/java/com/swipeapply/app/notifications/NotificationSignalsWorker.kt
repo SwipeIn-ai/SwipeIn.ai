@@ -30,14 +30,18 @@ class NotificationSignalsWorker(
         AppNotificationService.ensureChannels(applicationContext)
         if (!AppNotificationService.canNotify(applicationContext)) return Result.success()
 
-        runCatching {
+        return try {
             processSavedJobFollowUps()
             processHighMatchJobs()
-        }.onFailure {
-            return Result.retry()
+            Result.success()
+        } catch (e: Exception) {
+            // Only retry on transient errors, max 3 attempts
+            if (runAttemptCount < 3) {
+                Result.retry()
+            } else {
+                Result.success() // Give up after 3 attempts to prevent infinite retries
+            }
         }
-
-        return Result.success()
     }
 
     private suspend fun processSavedJobFollowUps() {
@@ -83,7 +87,7 @@ class NotificationSignalsWorker(
         val jobsResult = repository.refreshJobs(
             search = searchQuery,
             location = ApiConfig.DEFAULT_LOCATION,
-            remote = ApiConfig.DEFAULT_REMOTE_ONLY
+            remote = null
         )
 
         val jobs = jobsResult.getOrNull() ?: return

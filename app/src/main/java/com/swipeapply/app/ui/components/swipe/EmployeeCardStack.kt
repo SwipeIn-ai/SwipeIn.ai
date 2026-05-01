@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -41,10 +42,17 @@ fun EmployeeCardStack(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 16.dp),
+            .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Background cards (stacked behind)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 320.dp)
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Background cards (stacked behind)
         visibleCards.asReversed().forEachIndexed { reversedIndex, employee ->
             val index = visibleCards.size - 1 - reversedIndex
 
@@ -117,6 +125,7 @@ fun EmployeeCardStack(
                     )
                 }
             }
+        }
         }
     }
 }

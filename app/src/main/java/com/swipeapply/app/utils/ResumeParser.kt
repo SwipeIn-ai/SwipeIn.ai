@@ -3,52 +3,30 @@ package com.swipeapply.app.utils
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.swipeapply.app.BuildConfig
+import com.swipeapply.app.data.ai.GroqApiClient
 import com.swipeapply.app.data.model.*
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 object ResumeParser {
     private const val TAG = "ResumeParser"
-    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-    private const val MODEL = "llama-3.1-8b-instant"
-    
-    // OkHttp client with longer timeouts for AI responses
-    private val httpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(40, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-    }
 
     private val jsonParser = Json { 
         ignoreUnknownKeys = true 
         isLenient = true 
-        coerceInputValues = true  // Convert invalid values gracefully
+        coerceInputValues = true
     }
 
     /**
-     * Parses a resume from a PDF file using Groq AI.
-     * Extracts: name, email, phone, bio, skills, techStack, education, experience, projects
-     * 
-     * @param context Android context for content resolver
-     * @param uri URI of the PDF file to parse
-     * @return UserProfile with extracted data, or null if parsing fails
+     * Parses a resume from a PDF file using Groq AI via GroqApiClient.
+     * Includes automatic retry, rate-limit, and timeout handling.
+     * Falls back to ResumeParserV2 (regex) if Groq fails.
      */
     suspend fun parseResume(context: Context, uri: Uri): UserProfile? = withContext(Dispatchers.IO) {
         try {
-            // 1. Extract Text from PDF
             Log.d(TAG, "Extracting text from PDF...")
             val pdfText = extractTextFromPdf(context, uri)
             if (pdfText.isBlank()) {
@@ -58,87 +36,30 @@ object ResumeParser {
             
             Log.d(TAG, "Extracted ${pdfText.length} characters from PDF")
 
-            // 2. Send to Groq for JSON extraction
-            Log.d(TAG, "Sending resume to Groq ($MODEL) for analysis...")
-            val responseText = callGroq(pdfText)
+            Log.d(TAG, "Sending resume to Groq for analysis...")
+            val prompt = buildResumeParsePrompt(pdfText)
             
-            if (responseText.isNullOrBlank()) {
-                Log.e(TAG, "Groq returned empty response")
-                return@withContext null
+            val result = GroqApiClient.complete(
+                prompt = prompt,
+                temperature = 0.3,
+                maxTokens = 4096
+            )
+
+            when (result) {
+                is GroqApiClient.GroqResult.Success -> {
+                    val cleanedJson = cleanJsonResponse(result.content)
+                    Log.d(TAG, "Attempting to parse JSON...")
+                    val profile = jsonParser.decodeFromString<UserProfile>(cleanedJson)
+                    Log.d(TAG, "Successfully parsed resume for: ${profile.fullName}")
+                    profile
+                }
+                is GroqApiClient.GroqResult.Error -> {
+                    Log.e(TAG, "Groq failed: ${result.message}, falling back to ResumeParserV2")
+                    null
+                }
             }
-            
-            Log.d(TAG, "Groq response received: ${responseText.take(200)}...")
-
-            // 3. Clean and parse JSON
-            val cleanedJson = cleanJsonResponse(responseText)
-            Log.d(TAG, "Attempting to parse JSON...")
-            val profile = jsonParser.decodeFromString<UserProfile>(cleanedJson)
-            
-            Log.d(TAG, "Successfully parsed resume for: ${profile.fullName}")
-            return@withContext profile
-
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing resume: ${e.message}", e)
-            return@withContext null
-        }
-    }
-
-    /**
-     * Calls Groq API with the resume text and returns the AI response.
-     */
-    private fun callGroq(resumeText: String): String? {
-        val apiKey = BuildConfig.GROQ_API_KEY
-        if (apiKey.isBlank()) {
-            Log.e(TAG, "Groq API key is not configured")
-            return null
-        }
-        
-        val prompt = buildResumeParsePrompt(resumeText)
-        
-        // Build request body
-        val requestBody = JSONObject().apply {
-            put("model", MODEL)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", prompt)
-                })
-            })
-            put("temperature", 0.3) // Lower temperature for more consistent JSON output
-            put("max_tokens", 4096)
-        }
-        
-        val request = Request.Builder()
-            .url(GROQ_URL)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Content-Type", "application/json")
-            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-        
-        return try {
-            val response = httpClient.newCall(request).execute()
-            val responseBody = response.body.string()
-            
-            if (!response.isSuccessful) {
-                Log.e(TAG, "Groq API error: ${response.code} - $responseBody")
-                return null
-            }
-            
-            // Parse the Groq response to extract the content
-            val jsonResponse = JSONObject(responseBody)
-            val choices = jsonResponse.optJSONArray("choices")
-            if (choices != null && choices.length() > 0) {
-                val message = choices.getJSONObject(0).optJSONObject("message")
-                // Try content first, fall back to reasoning field (for reasoning models)
-                val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
-                    ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
-                content
-            } else {
-                Log.e(TAG, "No choices in Groq response")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Groq HTTP error: ${e.message}", e)
             null
         }
     }

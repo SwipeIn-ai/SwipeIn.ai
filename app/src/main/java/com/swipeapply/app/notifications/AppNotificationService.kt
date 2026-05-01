@@ -18,6 +18,8 @@ object AppNotificationService {
 
     const val CHANNEL_MATCHES = "job_matches"
     const val CHANNEL_FOLLOW_UP = "follow_ups"
+    private const val GROUP_MATCHES = "com.swipeapply.GROUP_MATCHES"
+    private const val GROUP_FOLLOW_UPS = "com.swipeapply.GROUP_FOLLOW_UPS"
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -74,6 +76,12 @@ object AppNotificationService {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val groupKey = when (channelId) {
+            CHANNEL_MATCHES -> GROUP_MATCHES
+            CHANNEL_FOLLOW_UP -> GROUP_FOLLOW_UPS
+            else -> null
+        }
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
@@ -82,6 +90,7 @@ object AppNotificationService {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .apply { if (groupKey != null) setGroup(groupKey) }
             .build()
 
         try {

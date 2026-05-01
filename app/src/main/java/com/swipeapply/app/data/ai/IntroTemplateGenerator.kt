@@ -1,40 +1,24 @@
 package com.swipeapply.app.data.ai
 
 import android.util.Log
-import com.swipeapply.app.BuildConfig
 import com.swipeapply.app.data.model.JobCard
 import com.swipeapply.app.data.model.UserProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
  * AI-powered cold outreach email generator.
  *
- * Uses Groq (Llama 3.1 8B Instant) to produce a personalized, crisp intro email
- * from the user's qualifications and the job's requirements.
+ * Uses Groq (Llama 3.1 8B Instant) via GroqApiClient to produce a personalized,
+ * crisp intro email from the user's qualifications and the job's requirements.
+ * Includes retry, rate-limit, and timeout handling via the shared client.
  *
  * Output: subject line + body, ready to edit and copy.
  */
 object IntroTemplateGenerator {
 
     private const val TAG = "IntroTemplateGenerator"
-    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-    private const val MODEL = "llama-3.1-8b-instant"
-
-    private val httpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-    }
 
     data class GeneratedTemplate(
         val subject: String,
@@ -43,59 +27,26 @@ object IntroTemplateGenerator {
 
     suspend fun generate(jobCard: JobCard, profile: UserProfile): GeneratedTemplate? =
         withContext(Dispatchers.IO) {
-            val apiKey = BuildConfig.GROQ_API_KEY
-            if (apiKey.isBlank()) {
-                Log.e(TAG, "Groq API key not configured")
-                return@withContext null
-            }
-
             val prompt = buildPrompt(jobCard, profile)
             val systemInstruction = "You are an expert career coach who writes ultra-concise, " +
                 "human-sounding cold outreach emails. " +
                 "You never use buzzwords, filler phrases, or generic claims. " +
                 "You write like a confident professional, not a template engine.\n\n"
 
-            val requestBody = JSONObject().apply {
-                put("model", MODEL)
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", systemInstruction + prompt)
-                    })
-                })
-                put("temperature", 0.2)
-                put("max_tokens", 512)
-            }
+            val result = GroqApiClient.complete(
+                prompt = systemInstruction + prompt,
+                temperature = 0.2,
+                maxTokens = 512
+            )
 
-            val request = Request.Builder()
-                .url(GROQ_URL)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-
-            return@withContext try {
-                val response = httpClient.newCall(request).execute()
-                val body = response.body.string()
-
-                if (!response.isSuccessful) {
-                    Log.e(TAG, "Groq error ${response.code}: $body")
-                    return@withContext null
+            when (result) {
+                is GroqApiClient.GroqResult.Success -> {
+                    parseResponse(result.content, jobCard)
                 }
-
-                val message = JSONObject(body)
-                    .optJSONArray("choices")
-                    ?.getJSONObject(0)
-                    ?.optJSONObject("message")
-
-                val content = message?.optString("content")?.takeIf { it.isNotBlank() && it != "null" }
-                    ?: message?.optString("reasoning")?.takeIf { it.isNotBlank() && it != "null" }
-                    ?: return@withContext null
-
-                parseResponse(content, jobCard)
-            } catch (e: Exception) {
-                Log.e(TAG, "Generation failed: ${e.message}", e)
-                null
+                is GroqApiClient.GroqResult.Error -> {
+                    Log.e(TAG, "Generation failed: ${result.message}")
+                    null
+                }
             }
         }
 
@@ -154,7 +105,7 @@ JOB:
 - Title: ${job.title}
 - Company: ${job.company.name}
 - Industry: ${job.company.industry}
-- Location: ${job.location} (${job.locationType.label})
+- Location: ${job.location}
 - Role summary: ${job.roleDescription.take(300)}
 - Required tech: ${job.techStack.joinToString(", ").ifBlank { "not listed" }}
 ${if (overlap.isNotBlank()) "- Overlapping skills to highlight: $overlap" else ""}

@@ -35,18 +35,29 @@ class EmployeeRepository {
         companyIdentifier: String,
         userId: String
     ): Result<EmployeeSearchResponse> = withContext(Dispatchers.IO) {
+        // Sanitize input to prevent path traversal
+        val sanitizedIdentifier = companyIdentifier
+            .replace("/", "")
+            .replace("\\", "")
+            .replace("..", "")
+            .trim()
+        
+        if (sanitizedIdentifier.isBlank()) {
+            return@withContext Result.failure(Exception("Invalid company name"))
+        }
+
         try {
-            Log.d(TAG, "Fetching employees for: $companyIdentifier (userId: $userId)")
+            Log.d(TAG, "Fetching employees for: $sanitizedIdentifier")
             
             val response = EmployeeApiClient.service.getCompanyEmployees(
-                companyIdentifier = companyIdentifier,
+                companyIdentifier = sanitizedIdentifier,
                 userId = userId
             )
 
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
-                Log.d(TAG, "✅ Found ${body.employees.size} employees at ${body.companyDomain}")
-                Log.d(TAG, "📊 Remaining swipes: ${body.remainingSwipes}")
+                Log.d(TAG, "Found ${body.employees.size} employees")
+                Log.d(TAG, "Remaining swipes: ${body.remainingSwipes}")
                 Result.success(body)
             } else {
                 // Try to parse the JSON error body for a user-friendly message
@@ -57,8 +68,8 @@ class EmployeeRepository {
                 } catch (_: Exception) { null }
                 
                 val errorMsg = serverMessage
-                    ?: "API Error ${response.code()}: ${response.message()}"
-                Log.e(TAG, "❌ $errorMsg")
+                    ?: "Could not load contacts. Please try again."
+                Log.e(TAG, "❌ API Error ${response.code()}: ${response.message()}")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {

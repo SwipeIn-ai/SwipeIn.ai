@@ -76,12 +76,6 @@ fun JobEntity.toJobCard(): JobCard {
             website = extractWebsiteFromUrl(this.url)
         )
         
-        val locationType = when {
-            this.remote -> LocationType.REMOTE
-            this.location.contains("hybrid", ignoreCase = true) -> LocationType.HYBRID
-            else -> LocationType.ONSITE
-        }
-        
         val techStack = extractTechStack(this.keywords)
         val description = this.description?.trim()?.takeIf { it.isNotEmpty() } 
             ?: "Exciting opportunity to join ${this.companyName} as a ${this.role}."
@@ -92,8 +86,6 @@ fun JobEntity.toJobCard(): JobCard {
             company = company,
             title = this.role.trim(),
             location = this.location.trim(),
-            locationType = locationType,
-            salary = null,
             techStack = techStack,
             isHiringNow = true,
             roleDescription = description,

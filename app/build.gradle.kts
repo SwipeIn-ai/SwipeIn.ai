@@ -108,7 +108,6 @@ dependencies {
     implementation(platform("io.github.jan-tennert.supabase:bom:3.3.0"))
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt") // Optional: For fetching user profiles if needed
-    implementation("io.ktor:ktor-client-cio:3.3.3")
     implementation("io.ktor:ktor-client-core:3.3.3")
     implementation("io.ktor:ktor-client-okhttp:3.3.3")
     implementation("io.ktor:ktor-client-content-negotiation:3.3.3")

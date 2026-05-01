@@ -32,7 +32,7 @@ fun GroqConsentScreen(
     onAllow: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
-    title: String = "Allow Groq to personalize your outreach?"
+    title: String = "Allow AI to personalize your outreach?"
 ) {
     Surface(
         modifier = modifier,
@@ -69,7 +69,7 @@ fun GroqConsentScreen(
             }
 
             Text(
-                text = "To generate a personalized email draft, SwipeApply sends relevant profile details to Groq.",
+                text = "To generate a personalized email draft, SwipeApply uses AI with relevant profile details.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

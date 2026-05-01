@@ -158,8 +158,9 @@ fun ProfileCreationScreen(
                 else -> {
                     ProfileConfirmationState(
                         profile = state.profile!!,
+                        error = state.error,
                         viewModel = viewModel,
-                        onBack = { onNavigateHome() } // Or go back to upload
+                        onBack = { viewModel.updateProfileField(null) }
                     )
                 }
             }
@@ -380,13 +381,6 @@ private fun ResumeAnalyzingState(
                             fontWeight = FontWeight.Bold,
                             color = BrandForeground
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Offline • No AI • 100% Accurate",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = BrandPrimary
-                        )
                     }
 
                     // Percentage circle
@@ -506,6 +500,7 @@ private fun ResumeAnalyzingState(
 @Composable
 private fun ProfileConfirmationState(
     profile: UserProfile,
+    error: String?,
     viewModel: ProfileCreationViewModel,
     onBack: () -> Unit
 ) {
@@ -612,8 +607,19 @@ private fun ProfileConfirmationState(
 
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Show save errors
+            if (error != null) {
+                Text(
+                    text = error,
+                    color = BrandDestructive,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            }
             
-            // Fixed Bottom CTA Placeholder (Visual only, real CTA at bottom of scroll right now)
+            // Save Profile CTA
             Surface(
                 onClick = { viewModel.saveProfile() },
                 shape = RoundedCornerShape(28.dp),
@@ -622,7 +628,7 @@ private fun ProfileConfirmationState(
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("Launch Application", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Save Profile & Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             

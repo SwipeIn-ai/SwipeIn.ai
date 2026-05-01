@@ -1,5 +1,6 @@
 package com.swipeapply.app.ui.screens
 
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.EaseInOutSine
@@ -91,6 +92,8 @@ object LinkedInOidc : OAuthProvider() {
 fun OnboardingScreen(
     onContinue: () -> Unit,
     onSkipLogin: () -> Unit = {},
+    onNavigateToPrivacyPolicy: () -> Unit = {},
+    onNavigateToTerms: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val supabase = SupabaseClient.client
@@ -226,6 +229,7 @@ fun OnboardingScreen(
                                         redirectUrl = "swipeapply://callback"
                                     )
                                 } catch (e: Exception) {
+                                    Log.e("OnboardingScreen", "Google sign-in failed", e)
                                     isGoogleLoading = false
                                     snackbarHostState.showSnackbar("Sign in failed. Please try again.")
                                 }
@@ -244,6 +248,7 @@ fun OnboardingScreen(
                                         redirectUrl = "swipeapply://callback"
                                     )
                                 } catch (e: Exception) {
+                                    Log.e("OnboardingScreen", "LinkedIn sign-in failed", e)
                                     isLinkedInLoading = false
                                     snackbarHostState.showSnackbar("Sign in failed. Please try again.")
                                 }
@@ -255,14 +260,46 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // ── Legal Footer ─────────────────────────────────────────────
-                Text(
-                    text = "By continuing, you agree to our Terms of Service and Privacy Policy.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MutedText.copy(alpha = 0.75f),
-                    textAlign = TextAlign.Center,
+                Row(
                     modifier = Modifier.padding(bottom = 20.dp, top = 4.dp).padding(horizontal = 8.dp),
-                    lineHeight = 16.sp
-                )
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "By continuing, you agree to our ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MutedText.copy(alpha = 0.75f),
+                    )
+                    TextButton(
+                        onClick = onNavigateToTerms,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                        modifier = Modifier.height(20.dp)
+                    ) {
+                        Text(
+                            text = "Terms",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = LinkedInBlue,
+                        )
+                    }
+                    Text(
+                        text = " and ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MutedText.copy(alpha = 0.75f),
+                    )
+                    TextButton(
+                        onClick = onNavigateToPrivacyPolicy,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                        modifier = Modifier.height(20.dp)
+                    ) {
+                        Text(
+                            text = "Privacy Policy",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = LinkedInBlue,
+                        )
+                    }
+                }
             }
         }
     }

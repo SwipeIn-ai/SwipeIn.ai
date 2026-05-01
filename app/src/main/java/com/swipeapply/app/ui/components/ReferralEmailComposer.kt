@@ -121,19 +121,9 @@ fun ReferralEmailComposerContent(
     val scrollState = rememberScrollState()
     val showEmailSkeleton = uiState.isGenerating && uiState.subject.isBlank() && uiState.body.isBlank()
 
-    var isCopied by remember { mutableStateOf(false) }
-
     // Initialize on composition
     LaunchedEffect(employee.email) {
         viewModel.initialize(employee, companyName, jobTitle)
-    }
-
-    // Reset copied state
-    LaunchedEffect(isCopied) {
-        if (isCopied) {
-            kotlinx.coroutines.delay(2000)
-            isCopied = false
-        }
     }
 
     Column(
@@ -286,13 +276,7 @@ fun ReferralEmailComposerContent(
         // Action buttons
         ActionButtons(
             isValid = uiState.isValid(),
-            isCopied = isCopied,
-            onCopy = {
-                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                copyToClipboard(context, viewModel.getFullEmailText())
-                isCopied = true
-            },
-            onOpenGmail = {
+            onSend = {
                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                 openEmailApp(context, uiState.toReferralEmail())
                 viewModel.markEmailSent()
@@ -307,7 +291,7 @@ fun ReferralEmailComposerContent(
             text = when {
                 uiState.aiGenerated -> "Edit freely before sending."
                 uiState.isGenerating -> "Generating customized draft...This may take a moment."
-                else -> "No draft yet. Tap regenerate to request a Groq template."
+                else -> "No draft yet. Tap regenerate to create an AI template."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -649,95 +633,56 @@ private fun CompactTextField(
 @Composable
 private fun ActionButtons(
     isValid: Boolean,
-    isCopied: Boolean,
-    onCopy: () -> Unit,
-    onOpenGmail: () -> Unit
+    onSend: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    Button(
+        onClick = onSend,
+        enabled = isValid,
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
+        ),
+        contentPadding = PaddingValues(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
     ) {
-        // Primary: Open in Gmail
-        Button(
-            onClick = onOpenGmail,
-            enabled = isValid,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent
-            ),
-            contentPadding = PaddingValues(),
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = if (isValid) {
-                            Brush.horizontalGradient(listOf(GmailRed, Color(0xFFFF6B6B)))
-                        } else {
-                            Brush.horizontalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                                )
+                .fillMaxSize()
+                .background(
+                    brush = if (isValid) {
+                        Brush.horizontalGradient(listOf(Color(0xFF0A66C2), Color(0xFF06B6D4)))
+                    } else {
+                        Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                             )
-                        },
-                        shape = RoundedCornerShape(14.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        contentDescription = null,
-                        tint = if (isValid) Color.White
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "Send Intro",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isValid) Color.White
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
-                }
-            }
-        }
-
-        // Secondary: Copy to clipboard
-        OutlinedButton(
-            onClick = onCopy,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = if (isCopied) SuccessGreen.copy(alpha = 0.08f)
-                else Color.Transparent
-            )
+                        )
+                    },
+                    shape = RoundedCornerShape(14.dp)
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                    Icons.AutoMirrored.Filled.Send,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (isCopied) SuccessGreen else MaterialTheme.colorScheme.primary
+                    tint = if (isValid) Color.White
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    modifier = Modifier.size(20.dp)
                 )
                 Text(
-                    text = if (isCopied) "Copied!" else "Copy Email",
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isCopied) SuccessGreen else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Send Referral Email",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isValid) Color.White
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 )
             }
         }

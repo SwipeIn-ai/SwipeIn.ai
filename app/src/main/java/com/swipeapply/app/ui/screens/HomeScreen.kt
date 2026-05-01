@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Group
@@ -115,7 +116,6 @@ import coil.request.ImageRequest
 import com.swipeapply.app.SupabaseClient
 import com.swipeapply.app.data.manager.GroqConsentManager
 import com.swipeapply.app.data.model.JobCard
-import com.swipeapply.app.data.model.LocationType
 import com.swipeapply.app.data.model.SwipeDirection
 import com.swipeapply.app.ui.components.ShimmerCardStack
 import com.swipeapply.app.ui.components.swipe.SwipeCardStack
@@ -138,12 +138,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onCardClicked: (JobCard) -> Unit,
-    onRequestIntro: (JobCard) -> Unit,
     onNavigateToEmployeeFinder: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onDarkModeToggle: (Boolean?) -> Unit = {},
     isDarkModeEnabled: Boolean? = null,
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToPrivacyPolicy: () -> Unit = {},
+    onNavigateToTerms: () -> Unit = {},
     onSignOutSuccess: () -> Unit
 ) {
     val application = LocalContext.current.applicationContext as Application
@@ -169,8 +170,8 @@ fun HomeScreen(
     LaunchedEffect(lastRightSwipedCompany) {
         lastRightSwipedCompany?.let { companyName ->
             val result = snackbarHostState.showSnackbar(
-                message = "Find referral contacts at $companyName?",
-                actionLabel = "Find Emails",
+                message = "Finding employees at $companyName...",
+                actionLabel = "View Contacts",
                 duration = SnackbarDuration.Short
             )
             if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -187,16 +188,6 @@ fun HomeScreen(
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showActivitySheet by remember { mutableStateOf(false) }
     var showLogoutConfirmation by remember { mutableStateOf(false) }
-    var activeFilter by rememberSaveable { mutableStateOf(HomeQuickFilter.ALL) }
-    val filteredCards = remember(uiState.cards, activeFilter) {
-        when (activeFilter) {
-            HomeQuickFilter.ALL -> uiState.cards
-            HomeQuickFilter.REMOTE -> uiState.cards.filter { it.locationType == LocationType.REMOTE }
-            HomeQuickFilter.HYBRID -> uiState.cards.filter { it.locationType == LocationType.HYBRID }
-            HomeQuickFilter.ONSITE -> uiState.cards.filter { it.locationType == LocationType.ONSITE }
-            HomeQuickFilter.TECH_STACK -> uiState.cards.filter { it.techStack.isNotEmpty() }
-        }
-    }
 
     LaunchedEffect(showSettingsSheet) {
         if (showSettingsSheet) {
@@ -211,22 +202,12 @@ fun HomeScreen(
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             HomeTopBar(
-                stats = viewModel.getStats(),
-                currentStreak = uiState.currentStreak,
-                todaySwipeCount = uiState.todaySwipeCount,
                 onUndo = {
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     viewModel.undoLastSwipe()
                 },
                 onActivityClick = { showActivitySheet = true },
-                swipeHistoryCount = uiState.swipeHistory.size,
                 onSettingsClick = { showSettingsSheet = true }
-            )
-
-            HomeQuickFilters(
-                activeFilter = activeFilter,
-                cards = uiState.cards,
-                onFilterSelected = { activeFilter = it }
             )
 
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -246,24 +227,10 @@ fun HomeScreen(
                             Text(text = "Loading more jobs...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    uiState.cards.isNotEmpty() && filteredCards.isEmpty() -> {
-                        FilterEmptyState(
-                            activeFilter = activeFilter,
-                            onReset = { activeFilter = HomeQuickFilter.ALL }
-                        )
-                    }
                     uiState.cards.isNotEmpty() -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (uiState.totalJobs > 0) {
-                                Text(
-                                    text = "${filteredCards.size} visible • ${uiState.cards.size} total remaining",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
                             SwipeCardStack(
-                                cards = filteredCards,
+                                cards = uiState.cards,
                                 onCardSwiped = { card, direction ->
                                     viewModel.onCardSwiped(card, direction)
                                     if (direction == SwipeDirection.RIGHT) {
@@ -282,29 +249,49 @@ fun HomeScreen(
                     }
                 }
 
-                // Floating Action Buttons OVER the cards
+                // Swipe hint — shown only when cards are visible
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
-                    enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = spring(dampingRatio = 0.8f)),
-                    exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it / 2 }),
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    visible = uiState.cards.isNotEmpty() && !uiState.isLoading && uiState.swipeHistory.isEmpty(),
+                    enter = fadeIn(tween(600)),
+                    exit = fadeOut(tween(400)),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
                 ) {
-                    ActionButtons(
-                        onSkip = {
-                            view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                            filteredCards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
-                        },
-                        onActivity = { showActivitySheet = true },
-                        onInterested = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            filteredCards.firstOrNull()?.let { card ->
-                                viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
-                                lastRightSwipedCompany = card.company.name
-                            }
-                        }
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = "← Not Interested  ·  Interested →",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
                 }
+
             }
+        }
+
+        // Floating action buttons — rendered outside Column so they float over everything
+        androidx.compose.animation.AnimatedVisibility(
+            visible = uiState.cards.isNotEmpty() && !uiState.isLoading,
+            enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = spring(dampingRatio = 0.8f)),
+            exit = fadeOut(tween(200)) + slideOutVertically(targetOffsetY = { it / 2 }),
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+        ) {
+            ActionButtons(
+                onSkip = {
+                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                    uiState.cards.firstOrNull()?.let { viewModel.onCardSwiped(it, SwipeDirection.LEFT) }
+                },
+                onInterested = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    uiState.cards.firstOrNull()?.let { card ->
+                        viewModel.onCardSwiped(card, SwipeDirection.RIGHT)
+                        lastRightSwipedCompany = card.company.name
+                    }
+                }
+            )
         }
 
         if (uiState.showBottomSheet && uiState.selectedCard != null) {
@@ -319,10 +306,6 @@ fun HomeScreen(
                 CompanyDetailSheet(
                     jobCard = uiState.selectedCard!!,
                     onDismiss = { viewModel.dismissBottomSheet() },
-                    onRequestIntro = {
-                        viewModel.dismissBottomSheet()
-                        onRequestIntro(uiState.selectedCard!!)
-                    },
                     onFindPeople = {
                         viewModel.dismissBottomSheet()
                         onNavigateToEmployeeFinder(uiState.selectedCard!!.company.name)
@@ -355,9 +338,9 @@ fun HomeScreen(
                         scope.launch {
                             snackbarHostState.showSnackbar(
                                 message = if (enabled) {
-                                    "Groq outreach personalization enabled."
+                                    "AI personalization enabled."
                                 } else {
-                                    "Groq outreach personalization disabled."
+                                    "AI personalization disabled."
                                 },
                                 duration = SnackbarDuration.Short
                             )
@@ -369,6 +352,26 @@ fun HomeScreen(
                     onNavigateToProfile = {
                         showSettingsSheet = false
                         onNavigateToProfile()
+                    },
+                    onNavigateToPrivacyPolicy = {
+                        showSettingsSheet = false
+                        onNavigateToPrivacyPolicy()
+                    },
+                    onNavigateToTerms = {
+                        showSettingsSheet = false
+                        onNavigateToTerms()
+                    },
+                    onDeleteAccount = {
+                        showSettingsSheet = false
+                        scope.launch {
+                            try {
+                                viewModel.performSignOut()
+                                com.swipeapply.app.data.repository.UserSyncRepository.clearSession()
+                                com.swipeapply.app.data.repository.SavedContactsRepository.clearAll()
+                                supabase.auth.signOut(scope = SignOutScope.LOCAL)
+                                delay(250L)
+                            } catch (_: Exception) { } finally { onSignOutSuccess() }
+                        }
                     },
                     onUndoAll = {
                         if (uiState.undoHistory.isNotEmpty()) {
@@ -473,9 +476,6 @@ private fun HomeQuickFilters(
         HomeQuickFilter.entries.forEach { filter ->
             val count = when (filter) {
                 HomeQuickFilter.ALL -> cards.size
-                HomeQuickFilter.REMOTE -> cards.count { it.locationType == LocationType.REMOTE }
-                HomeQuickFilter.HYBRID -> cards.count { it.locationType == LocationType.HYBRID }
-                HomeQuickFilter.ONSITE -> cards.count { it.locationType == LocationType.ONSITE }
                 HomeQuickFilter.TECH_STACK -> cards.count { it.techStack.isNotEmpty() }
             }
             FilterChip(
@@ -519,17 +519,10 @@ private fun FilterEmptyState(
 
 @Composable
 private fun HomeTopBar(
-    stats: com.swipeapply.app.ui.viewmodel.SwipeStats,
-    currentStreak: Int,
-    todaySwipeCount: Int,
     onUndo: () -> Unit,
     onActivityClick: () -> Unit,
-    swipeHistoryCount: Int,
     onSettingsClick: () -> Unit
 ) {
-    val dailyGoal = com.swipeapply.app.data.manager.StreakManager.DAILY_GOAL
-    val goalReached = todaySwipeCount >= dailyGoal
-    val progress = (todaySwipeCount.toFloat() / dailyGoal).coerceIn(0f, 1f)
 
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
@@ -551,85 +544,6 @@ private fun HomeTopBar(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Streak pill — only shown once user has started a streak
-                    AnimatedVisibility(
-                        visible = currentStreak > 0,
-                        enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
-                        exit = scaleOut() + fadeOut()
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (goalReached)
-                                AccentGreen.copy(alpha = 0.15f)
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "\uD83D\uDD25",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                                Text(
-                                    text = "$currentStreak",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (goalReached) AccentGreen else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "\u2022",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "$todaySwipeCount/$dailyGoal",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (goalReached) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = stats.interested > 0,
-                        enter = scaleIn(spring(dampingRatio = 0.6f)) + fadeIn(),
-                        exit = scaleOut() + fadeOut()
-                    ) {
-                        StatBadge(count = stats.interested, color = AccentGreen)
-                    }
-
-                    IconButton(onClick = onActivityClick) {
-                        Box(contentAlignment = Alignment.TopEnd) {
-                            Icon(
-                                imageVector = Icons.Default.Bookmark,
-                                contentDescription = "Swipe activity",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = swipeHistoryCount > 0,
-                                enter = scaleIn() + fadeIn(),
-                                exit = scaleOut() + fadeOut()
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = GradientStart,
-                                    modifier = Modifier.offset(x = 6.dp, y = (-4).dp)
-                                ) {
-                                    Text(
-                                        text = swipeHistoryCount.coerceAtMost(99).toString(),
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
 
                     IconButton(onClick = onSettingsClick) {
                         Icon(
@@ -639,20 +553,6 @@ private fun HomeTopBar(
                         )
                     }
                 }
-            }
-
-            // Daily goal progress bar — subtle, only visible when streak is active
-            AnimatedVisibility(
-                visible = currentStreak > 0,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(2.dp),
-                    color = if (goalReached) AccentGreen else GradientStart,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
             }
         }
     }
@@ -668,12 +568,18 @@ private fun SettingsSheet(
     onToggleRanking: () -> Unit,
     isRanking: Boolean,
     onNavigateToProfile: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit = {},
+    onNavigateToTerms: () -> Unit = {},
+    onDeleteAccount: () -> Unit = {},
     onUndoAll: () -> Unit,
     undoCount: Int,
     onLogout: () -> Unit
 ) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val supportContext = LocalContext.current
+
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp).navigationBarsPadding()
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp).navigationBarsPadding()
     ) {
         Text(
             text = "Settings",
@@ -713,11 +619,11 @@ private fun SettingsSheet(
 
         SettingsItem(
             icon = Icons.Default.Lock,
-            title = "Groq Personalization",
+            title = "AI Personalization",
             subtitle = if (isGroqConsentEnabled) {
-                "Profile sharing for outreach is enabled"
+                "Personalized outreach messages enabled"
             } else {
-                "Profile sharing for outreach is disabled"
+                "Personalized outreach messages disabled"
             },
             onClick = { onGroqConsentToggle(!isGroqConsentEnabled) },
             trailing = {
@@ -772,12 +678,80 @@ private fun SettingsSheet(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
+        // ── Legal & Support ──
+        SettingsItem(
+            icon = Icons.Default.Lock,
+            title = "Privacy Policy",
+            subtitle = "How we handle your data",
+            onClick = onNavigateToPrivacyPolicy
+        )
+
+        SettingsItem(
+            icon = Icons.Default.Star,
+            title = "Terms of Service",
+            subtitle = "Rules and guidelines",
+            onClick = onNavigateToTerms
+        )
+
+        SettingsItem(
+            icon = Icons.Default.Email,
+            title = "Contact Support",
+            subtitle = "swipein.ai@gmail.com",
+            onClick = {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                        data = android.net.Uri.parse("mailto:swipein.ai@gmail.com")
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "SwipeIn Support Request")
+                    }
+                    supportContext.startActivity(intent)
+                } catch (_: Exception) { }
+            }
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+        // ── Account Actions ──
         SettingsItem(
             icon = Icons.Default.ExitToApp,
             title = "Sign Out",
             subtitle = "Log out of your account",
-            onClick = onLogout,
+            onClick = onLogout
+        )
+
+        SettingsItem(
+            icon = Icons.Default.Close,
+            title = "Delete Account",
+            subtitle = "Permanently remove your data",
+            onClick = { showDeleteConfirmation = true },
             tint = MaterialTheme.colorScheme.error
+        )
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Account", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Are you sure you want to delete your account? This will permanently remove " +
+                    "all your data including saved jobs, swipe history, and profile information. " +
+                    "This action cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onDeleteAccount()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete Account") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel") }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp)
         )
     }
 }
@@ -932,15 +906,14 @@ private fun EmptyState(interestedCount: Int, onReset: () -> Unit) {
 }
 
 @Composable
-private fun ActionButtons(onSkip: () -> Unit, onActivity: () -> Unit, onInterested: () -> Unit) {
+private fun ActionButtons(onSkip: () -> Unit, onInterested: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp).padding(bottom = 24.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 64.dp).padding(bottom = 28.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ActionButton(icon = Icons.Default.Close, contentDescription = "Skip", containerColor = Color.White, contentColor = Color(0xFF657786), onClick = onSkip, modifier = Modifier.offset(y = (-16).dp))
-        ActionButton(icon = Icons.Default.Bookmark, contentDescription = "Activity", containerColor = Color.White, contentColor = Color(0xFF2196F3), onClick = onActivity, isSmall = true, modifier = Modifier.offset(y = 8.dp))
-        ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = Color.White, contentColor = Color(0xFFFF5252), onClick = onInterested, modifier = Modifier.offset(y = (-16).dp))
+        ActionButton(icon = Icons.Default.Close, contentDescription = "Not Interested", containerColor = MaterialTheme.colorScheme.surface, contentColor = AccentRed, onClick = onSkip, isLarge = true)
+        ActionButton(icon = Icons.Default.Favorite, contentDescription = "Interested", containerColor = MaterialTheme.colorScheme.surface, contentColor = Color(0xFFFD297B), onClick = onInterested, isLarge = true)
     }
 }
 
@@ -952,9 +925,6 @@ private enum class ActivityFilter {
 
 private enum class HomeQuickFilter(val label: String) {
     ALL("All"),
-    REMOTE("Remote"),
-    HYBRID("Hybrid"),
-    ONSITE("On-site"),
     TECH_STACK("Tech stack")
 }
 
@@ -995,7 +965,7 @@ private fun SwipeActivitySheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "$likedCount liked • $skippedCount skipped",
+                    text = "$likedCount interested • $skippedCount passed",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1019,12 +989,12 @@ private fun SwipeActivitySheet(
             FilterChip(
                 selected = filter == ActivityFilter.LIKED,
                 onClick = { filter = ActivityFilter.LIKED },
-                label = { Text("Liked ($likedCount)") }
+                label = { Text("Interested ($likedCount)") }
             )
             FilterChip(
                 selected = filter == ActivityFilter.DISLIKED,
                 onClick = { filter = ActivityFilter.DISLIKED },
-                label = { Text("Skipped ($skippedCount)") }
+                label = { Text("Passed ($skippedCount)") }
             )
         }
 
@@ -1117,7 +1087,7 @@ private fun SwipeActivityItem(
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = if (item.isInterested) "Liked" else "Skipped",
+                            text = if (item.isInterested) "Interested" else "Passed",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = accentColor
@@ -1174,8 +1144,8 @@ private fun ActionButton(
     isLarge: Boolean = false,
     isSmall: Boolean = false
 ) {
-    val size = if (isSmall) 48.dp else if (isLarge) 68.dp else 56.dp
-    val iconSize = if (isSmall) 24.dp else if (isLarge) 32.dp else 28.dp
+    val size = if (isSmall) 48.dp else if (isLarge) 64.dp else 56.dp
+    val iconSize = if (isSmall) 24.dp else if (isLarge) 30.dp else 28.dp
     FilledIconButton(
         onClick = onClick,
         modifier = modifier.size(size).shadow(elevation = 16.dp, shape = CircleShape, spotColor = contentColor.copy(alpha = 0.4f)),
@@ -1202,7 +1172,7 @@ private fun extractDomain(url: String?): String? {
 }
 
 @Composable
-private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onRequestIntro: () -> Unit, onFindPeople: () -> Unit) {
+private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onFindPeople: () -> Unit) {
     val domain = extractDomain(jobCard.company.website) ?: (jobCard.company.name.replace(" ", "").lowercase() + ".com")
     val displayUrl = "https://logos.hunter.io/$domain"
 
@@ -1263,55 +1233,28 @@ private fun CompanyDetailSheet(jobCard: JobCard, onDismiss: () -> Unit, onReques
             }
         }
         Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Single primary action: Find Emails → intro → referral template
+        Box(
+            modifier = Modifier.fillMaxWidth().height(56.dp).background(
+                brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
+                shape = RoundedCornerShape(16.dp)
+            ).clip(RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            // Secondary — Find People
-            Surface(
-                onClick = onFindPeople,
-                modifier = Modifier.weight(1f).height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Group,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Find people",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            // Primary action: send intro
-            Box(
-                modifier = Modifier.weight(1f).height(56.dp).background(
-                    brush = Brush.horizontalGradient(colors = listOf(GradientStart, GradientEnd)),
-                    shape = RoundedCornerShape(16.dp)
-                ).clip(RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                TextButton(onClick = onRequestIntro, modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        text = "Send intro",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
+            TextButton(onClick = onFindPeople, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Default.Group,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Find Emails & Send Intro",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
@@ -1374,7 +1317,7 @@ private fun UndoHistoryItem(action: UndoableAction) {
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = if (action.result.isInterested) "Liked" else "Skipped",
+                        text = if (action.result.isInterested) "Interested" else "Passed",
                         style = MaterialTheme.typography.labelSmall,
                         color = if (action.result.isInterested) AccentGreen else AccentRed,
                         fontWeight = FontWeight.SemiBold
