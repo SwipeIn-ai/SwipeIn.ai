@@ -3,6 +3,8 @@ package com.swipeapply.app.data.repository
 import android.content.Context
 import android.util.Log
 import com.swipeapply.app.data.api.FindWorkApiService
+import com.swipeapply.app.data.api.JobSpyApiClient
+import com.swipeapply.app.data.api.JobSpyApiService
 import com.swipeapply.app.data.local.SwipeApplyDatabase
 import com.swipeapply.app.data.local.entity.SwipedJobEntity
 import com.swipeapply.app.data.manager.SavedJobStatusManager
@@ -92,6 +94,10 @@ class JobRepository(private val context: Context, private val apiKey: String) {
             .create(FindWorkApiService::class.java)
     }
 
+    private val jobSpyService: JobSpyApiService by lazy {
+        JobSpyApiClient.service
+    }
+
     // --- QUEUE SYSTEM ---
     private val jobQueue = ArrayDeque<JobCard>()
     private val queuedJobIds = HashSet<String>()
@@ -102,6 +108,12 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     private var totalCount = 0
     private var isFetching = false
     private var isFallbackMode = false
+
+    // --- JOBSPY PAGINATION STATE ---
+    private var jobSpyCurrentPage = 1
+    private var jobSpyTotalPages = 1
+    private var jobSpyHasMorePages = true
+    private var jobSpyFetched = false // Whether we've done the initial JobSpy fetch
 
     /**
      * Get INITIAL batch of 15 jobs.
@@ -115,31 +127,44 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     ): Flow<Result<List<JobCard>>> = flow {
         if (forceRefresh) clearCache()
 
-        // 1. Try filling queue from API
+        // 1. HIGH PRIORITY: Fetch from FindWork API first (fast response, shown to user immediately)
         if (jobQueue.isEmpty()) {
-            // Reset pagination state so we always get a fresh fetch attempt
             currentPage = 1
             hasMorePages = true
             isFallbackMode = false
+            jobSpyCurrentPage = 1
+            jobSpyTotalPages = 1
+            jobSpyHasMorePages = true
+            jobSpyFetched = false
+
+            // FindWork loads first — results surface to the user right away
             fetchAndQueueJobs(search, location, remote)
         }
 
-        // 2. DB FALLBACK: If API didn't give us anything (network error or empty), check local DB
+        // 2. BACKGROUND: Fetch from JobSpy API (appended to queue while user is already swiping)
+        if (jobQueue.size < maxQueueSize) {
+            fetchAndQueueJobSpyJobs(search, location)
+        }
+
+        // 3. DB FALLBACK: If APIs didn't give us anything, check local DB
         if (jobQueue.isEmpty()) {
-            Log.w(TAG, "API empty/failed. Attempting Local Database Fallback...")
+            Log.w(TAG, "APIs empty/failed. Attempting Local Database Fallback...")
             loadFromDatabaseFallback()
         }
 
-        // 3. REMOTE FALLBACK: If even DB is empty, try broader API search
+        // 4. REMOTE FALLBACK: If even DB is empty, try broader API search
         if (jobQueue.isEmpty() && !isFallbackMode) {
             Log.w(TAG, "Local DB empty. Switching to Remote Fallback.")
             isFallbackMode = true
             currentPage = 1
             hasMorePages = true
+            jobSpyCurrentPage = 1
+            jobSpyHasMorePages = true
             fetchAndQueueJobs(null, null, true)
+            fetchAndQueueJobSpyJobs(null, null)
         }
 
-        // 4. Prepare Batch for UI (Max 15)
+        // 5. Prepare Batch for UI (Max 15)
         val initialBatch = mutableListOf<JobCard>()
         repeat(15) {
             jobQueue.removeFirstOrNull()?.let { 
@@ -164,13 +189,22 @@ class JobRepository(private val context: Context, private val apiKey: String) {
     ): JobCard? = withContext(Dispatchers.IO) {
         
         // Background fetch trigger
-        if (jobQueue.size < 5 && hasMorePages && !isFetching) {
+        if (jobQueue.size < 5 && !isFetching) {
             try {
-                if (isFallbackMode) fetchAndQueueJobs(null, null, true)
-                else fetchAndQueueJobs(search, location, remote)
+                // FindWork first (high priority) - fast response
+                if (hasMorePages) {
+                    if (isFallbackMode) fetchAndQueueJobs(null, null, true)
+                    else fetchAndQueueJobs(search, location, remote)
+                }
+                // JobSpy in background (appended to queue)
+                if (jobSpyHasMorePages) {
+                    fetchAndQueueJobSpyJobs(
+                        if (isFallbackMode) null else search,
+                        if (isFallbackMode) null else location
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Background fetch failed, trying DB...", e)
-                // If background fetch fails, try squeezing more from DB
                 loadFromDatabaseFallback()
             }
         }
@@ -204,7 +238,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
                 )
 
                 hasMorePages = response.next != null
-                totalCount = response.count
+                totalCount += response.count
 
                 // 1. Map to Entities (Clean HTML happens here via Mapper)
                 // Use mapNotNull so one bad job doesn't kill the entire page
@@ -242,6 +276,80 @@ class JobRepository(private val context: Context, private val apiKey: String) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Fetch error: ${e.message}")
+        } finally {
+            isFetching = false
+        }
+    }
+
+    /**
+     * Fetch from JobSpy API (BACKGROUND) -> Save to DB -> Add to BACK of Queue
+     * FindWork jobs are shown first; JobSpy jobs are appended as they load.
+     */
+    private suspend fun fetchAndQueueJobSpyJobs(search: String?, location: String?) {
+        if (isFetching) return
+        isFetching = true
+
+        val swipedIds = jobDao.getSwipedJobIdsByUser(currentUserId).toSet()
+
+        try {
+            while (jobSpyHasMorePages && jobQueue.size < maxQueueSize) {
+                Log.d(TAG, "Fetching JobSpy Page $jobSpyCurrentPage...")
+                val response = jobSpyService.getJobs(
+                    keyword = search ?: "jobs",
+                    location = location,
+                    page = jobSpyCurrentPage,
+                    pageSize = 20,
+                    sortBy = "date",
+                    sortOrder = "desc",
+                    site = JobSpyApiService.DEFAULT_SITES,
+                    countryIndeed = "india"
+                )
+
+                jobSpyTotalPages = response.totalPages
+                jobSpyHasMorePages = jobSpyCurrentPage < jobSpyTotalPages
+                totalCount += response.count
+
+                // 1. Map to Entities
+                val jobEntities = response.jobs.mapNotNull {
+                    try { it.toEntity() } catch (e: Exception) {
+                        Log.w(TAG, "Skipping malformed JobSpy job: ${e.message}")
+                        null
+                    }
+                }
+
+                // 2. SAVE TO DB (Persistence)
+                if (jobEntities.isNotEmpty()) {
+                    jobDao.insertJobs(jobEntities)
+                    Log.d(TAG, "Saved ${jobEntities.size} JobSpy jobs to local database.")
+                }
+
+                // 3. Convert to Cards for Queue
+                val rawJobs = jobEntities.mapNotNull {
+                    try { it.toJobCard() } catch (e: Exception) { null }
+                }
+
+                // 4. Filter Duplicates (Swiped or already queued)
+                val validJobs = rawJobs.filter {
+                    !swipedIds.contains(it.id) && !queuedJobIds.contains(it.id)
+                }
+
+                // 5. Add to BACK of queue (background priority)
+                // JobSpy jobs append after FindWork jobs so users see FindWork results first
+                validJobs.forEach {
+                    jobQueue.add(it)
+                    queuedJobIds.add(it.id)
+                }
+
+                Log.d(TAG, "Queued ${validJobs.size} JobSpy jobs (background)")
+                jobSpyCurrentPage++
+
+                if (validJobs.isEmpty() && !jobSpyHasMorePages) break
+            }
+
+            jobSpyFetched = true
+        } catch (e: Exception) {
+            Log.e(TAG, "JobSpy fetch error: ${e.message}")
+            jobSpyFetched = true // Mark as attempted even on failure
         } finally {
             isFetching = false
         }
@@ -333,7 +441,12 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         queuedJobIds.clear()
         currentPage = 1
         hasMorePages = true
+        totalCount = 0
         isFallbackMode = false
+        jobSpyCurrentPage = 1
+        jobSpyTotalPages = 1
+        jobSpyHasMorePages = true
+        jobSpyFetched = false
     }
     
     suspend fun clearSwipeHistory() = withContext(Dispatchers.IO) {
@@ -362,7 +475,7 @@ class JobRepository(private val context: Context, private val apiKey: String) {
         return result
     }
 
-    fun hasMorePages() = hasMorePages
+    fun hasMorePages() = hasMorePages || jobSpyHasMorePages
     fun getTotalCount() = totalCount
     suspend fun getJobCardById(id: String): JobCard? = withContext(Dispatchers.IO) {
         jobDao.getJobById(id)?.toJobCard()

@@ -2,6 +2,7 @@ package com.swipeapply.app.data.mapper
 
 import android.util.Log
 import com.swipeapply.app.data.api.model.FindWorkJob
+import com.swipeapply.app.data.api.model.JobSpyJob
 import com.swipeapply.app.data.local.entity.JobEntity
 import com.swipeapply.app.data.model.*
 
@@ -51,6 +52,76 @@ fun FindWorkJob.toEntity(): JobEntity {
         Log.e(TAG, "toEntity() - ERROR: ${e.message}", e)
         throw e
     }
+}
+
+// JobSpy API to Entity
+fun JobSpyJob.toEntity(): JobEntity {
+    try {
+        Log.d(TAG, "toEntity(JobSpy) - ID: $id, Company: $company")
+        fun String?.cleanHtml(): String {
+            if (this == null) return ""
+            return this.replace(Regex("<[^>]*>"), "")
+                .replace("&amp;", "&")
+                .replace("&nbsp;", " ")
+                .replace("&quot;", "\"")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+        }
+        val titleText = this.title.trim().takeIf { it.isNotEmpty() } ?: "Unknown Role"
+        val companyText = this.company.trim().takeIf { it.isNotEmpty() } ?: "Unknown Company"
+        val locationText = buildJobSpyLocation()
+
+        // Extract keywords from title and description
+        val keywords = extractKeywordsFromDescription(this.description, this.title)
+
+        val entity = JobEntity(
+            id = "jobspy_${this.id.trim()}",
+            role = titleText,
+            companyName = companyText,
+            location = locationText,
+            remote = this.isRemote,
+            url = this.jobUrl?.trim(),
+            description = this.description?.cleanHtml(),
+            datePosted = this.datePosted,
+            keywords = keywords,
+            source = this.source ?: "jobspy",
+            employmentType = this.jobType,
+            logoUrl = this.logoUrl?.trim()
+        )
+
+        Log.d(TAG, "toEntity(JobSpy) - ✓ Success")
+        return entity
+    } catch (e: Exception) {
+        Log.e(TAG, "toEntity(JobSpy) - ERROR: ${e.message}", e)
+        throw e
+    }
+}
+
+private fun JobSpyJob.buildJobSpyLocation(): String {
+    // Prefer the full location field, fall back to city/state/country parts
+    if (!this.location.isNullOrBlank()) return this.location.trim()
+    val parts = listOfNotNull(
+        this.city?.trim()?.takeIf { it.isNotEmpty() },
+        this.state?.trim()?.takeIf { it.isNotEmpty() },
+        this.country?.trim()?.takeIf { it.isNotEmpty() }
+    )
+    if (parts.isNotEmpty()) return parts.joinToString(", ")
+    return if (this.isRemote) "Remote" else "Unknown Location"
+}
+
+private fun extractKeywordsFromDescription(description: String?, title: String): String? {
+    val commonTech = listOf(
+        "kotlin", "java", "swift", "react", "typescript", "javascript",
+        "python", "go", "rust", "c++", "node.js", "django", "flask",
+        "react native", "flutter", "jetpack compose", "swiftui",
+        "graphql", "rest", "postgresql", "mongodb", "redis",
+        "aws", "gcp", "azure", "docker", "kubernetes",
+        "spring", "angular", "vue", "next.js", "express",
+        "sql", "nosql", "tensorflow", "pytorch", "machine learning"
+    )
+    val text = "${title} ${description ?: ""}".lowercase()
+    val found = commonTech.filter { text.contains(it) }
+    return if (found.isNotEmpty()) found.joinToString(",") else null
 }
 
 // Entity to Domain Model (JobCard)
@@ -124,12 +195,20 @@ private fun extractIndustryFromKeywords(keywords: String?): String {
     return "Technology"
 }
 
+private val JOB_BOARD_DOMAINS_MAPPER = setOf(
+    "findwork.dev", "linkedin.com", "indeed.com", "glassdoor.com",
+    "monster.com", "ziprecruiter.com", "careerbuilder.com",
+    "simplyhired.com", "dice.com", "lever.co", "greenhouse.io",
+    "workday.com", "naukri.com", "foundit.in", "jobspy"
+)
+
 private fun extractWebsiteFromUrl(url: String?): String? {
     if (url.isNullOrBlank()) return null
     return try {
         val domain = url.substringAfter("://").substringBefore("/")
         val cleanDomain = domain.removePrefix("www.")
-        if (cleanDomain.equals("findwork.dev", ignoreCase = true)) null else cleanDomain
+        // Return null if this is a job-board domain — not the actual company site
+        if (JOB_BOARD_DOMAINS_MAPPER.any { cleanDomain.contains(it, ignoreCase = true) }) null else cleanDomain
     } catch (e: Exception) {
         null
     }

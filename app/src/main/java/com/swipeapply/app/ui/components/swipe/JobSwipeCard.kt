@@ -260,6 +260,18 @@ private fun CardHeader(jobCard: JobCard) {
     HorizontalDivider(color = BrandMuted.copy(alpha = 0.6f))
 }
 
+// Job board domains that should never be used as company logo sources
+private val JOB_BOARD_DOMAINS = setOf(
+    "linkedin.com", "indeed.com", "glassdoor.com", "monster.com",
+    "ziprecruiter.com", "careerbuilder.com", "simplyhired.com",
+    "dice.com", "lever.co", "greenhouse.io", "workday.com",
+    "jobspy", "findwork.dev", "naukri.com", "foundit.in"
+)
+
+/**
+ * Extracts the bare domain (e.g. "stripe.com") from a full URL.
+ * Returns null if the URL is blank or fails to parse.
+ */
 private fun extractDomain(url: String?): String? {
     if (url.isNullOrBlank()) return null
     return try {
@@ -275,11 +287,43 @@ private fun extractDomain(url: String?): String? {
     }
 }
 
+/**
+ * Returns true if the given URL belongs to a known job-board (not the company itself).
+ * We should never use these as logo sources.
+ */
+private fun isJobBoardUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return true
+    val lower = url.lowercase()
+    return JOB_BOARD_DOMAINS.any { lower.contains(it) }
+}
+
 @Composable
 private fun CompanyLogo(company: Company) {
-    val initials = company.name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
-    val domain = extractDomain(company.website) ?: (company.name.replace(" ", "").lowercase() + ".com")
-    val displayUrl = company.logoUrl ?: "https://logos.hunter.io/$domain"
+    val initials = company.name
+        .split(" ")
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercase() }
+        .joinToString("")
+
+    // Derive the company's own domain:
+    //  1. Prefer company.website (already cleaned to bare domain by the mapper)
+    //  2. Fall back to guessing <companyname>.com (strips spaces / punctuation)
+    val companyDomain = extractDomain(company.website)
+        ?: company.name
+            .lowercase()
+            .replace(Regex("[^a-z0-9]"), "")
+            .let { if (it.isNotEmpty()) "$it.com" else null }
+
+    // Build the Hunter.io logo URL from the company domain
+    val hunterLogoUrl = companyDomain?.let { "https://logos.hunter.io/$it" }
+
+    // Use the API-supplied logoUrl ONLY if it's not a job-board URL.
+    // Otherwise always fall back to Hunter.io.
+    val displayUrl: String? = when {
+        company.logoUrl != null && !isJobBoardUrl(company.logoUrl) -> company.logoUrl
+        hunterLogoUrl != null -> hunterLogoUrl
+        else -> null
+    }
 
     Surface(
         modifier = Modifier.size(56.dp),
@@ -289,30 +333,41 @@ private fun CompanyLogo(company: Company) {
         border = BorderStroke(1.dp, BrandBorder)
     ) {
         Box(contentAlignment = Alignment.Center) {
+            // Gradient background (visible when logo fails to load)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(Chart2.copy(alpha = 0.1f), Chart3.copy(alpha = 0.1f), BrandPrimary.copy(alpha = 0.1f))
+                            colors = listOf(
+                                Chart2.copy(alpha = 0.1f),
+                                Chart3.copy(alpha = 0.1f),
+                                BrandPrimary.copy(alpha = 0.1f)
+                            )
                         )
                     )
             )
+            // Initials fallback (rendered under the image)
             Text(
                 text = initials,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
                 color = BrandForeground
             )
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(displayUrl)
-                    .crossfade(300)
-                    .build(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop
-            )
+            // Company logo via Hunter.io (overlays initials on success)
+            if (displayUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(displayUrl)
+                        .crossfade(300)
+                        .build(),
+                    contentDescription = "${company.name} logo",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
     }
 }

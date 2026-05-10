@@ -41,6 +41,9 @@ android {
         val findworkKey = envProperties.getProperty("FINDWORK_API_KEY") ?: ""
         buildConfigField("String", "FINDWORK_API_KEY", "\"$findworkKey\"")
         
+        val jobspyBaseUrl = envProperties.getProperty("JOBSPY_BASE_URL") ?: ""
+        buildConfigField("String", "JOBSPY_BASE_URL", "\"$jobspyBaseUrl\"")
+        
         val supabaseUrl = envProperties.getProperty("SUPABASE_URL") ?: ""
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         
