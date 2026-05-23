@@ -11,9 +11,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import com.swipeapply.app.data.config.ApiConfig
 
 private const val TAG = "UserSyncRepo"
-private const val BASE_URL = "http://144.24.154.69:8080"
+private val BASE_URL = ApiConfig.EMPLOYEE_API_BASE_URL
 
 /**
  * Syncs the Supabase-authenticated user with the SwipeIn backend.
@@ -78,7 +79,7 @@ object UserSyncRepository {
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/api/v1/users/sync")
+                .url("${BASE_URL}api/v1/users/sync")
                 .post(payload.toRequestBody("application/json".toMediaType()))
                 .build()
 

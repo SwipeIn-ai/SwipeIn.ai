@@ -1,5 +1,6 @@
 package com.swipeapply.app.data.api
 
+import com.swipeapply.app.data.config.ApiConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -12,7 +13,7 @@ import java.util.concurrent.TimeUnit
  */
 object EmployeeApiClient {
 
-    private const val BASE_URL = "http://144.24.154.69:8080/"
+    private val BASE_URL = ApiConfig.EMPLOYEE_API_BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC

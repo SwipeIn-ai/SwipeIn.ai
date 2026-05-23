@@ -44,6 +44,9 @@ android {
         val jobspyBaseUrl = envProperties.getProperty("JOBSPY_BASE_URL") ?: ""
         buildConfigField("String", "JOBSPY_BASE_URL", "\"$jobspyBaseUrl\"")
         
+        val employeeApiBaseUrl = envProperties.getProperty("EMPLOYEE_API_BASE_URL") ?: ""
+        buildConfigField("String", "EMPLOYEE_API_BASE_URL", "\"$employeeApiBaseUrl\"")
+        
         val supabaseUrl = envProperties.getProperty("SUPABASE_URL") ?: ""
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         
@@ -66,6 +69,20 @@ android {
             jvmTarget.set(
                 org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
             )
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 }

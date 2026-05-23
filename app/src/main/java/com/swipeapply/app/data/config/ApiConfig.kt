@@ -13,6 +13,11 @@ object ApiConfig {
         "https://api.sudhirsharma.dev/"
     }
     
+    // Employee API base URL (defaults to hosted instance, can be overridden via BuildConfig)
+    val EMPLOYEE_API_BASE_URL: String = com.swipeapply.app.BuildConfig.EMPLOYEE_API_BASE_URL.ifEmpty {
+        "http://144.24.154.69:8080/"
+    }
+    
     // Search preferences - null to get ALL jobs without filtering
     val DEFAULT_SEARCH_QUERY: String? = null  // null = all jobs, or set specific keyword like "android"
     val DEFAULT_LOCATION: String? = null  // null = worldwide (no location filter)

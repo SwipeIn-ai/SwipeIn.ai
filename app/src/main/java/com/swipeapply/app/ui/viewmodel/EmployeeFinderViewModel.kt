@@ -120,17 +120,22 @@ class EmployeeFinderViewModel : ViewModel() {
                 val result = repository.fetchEmployees(cleanedIdentifier, userId)
 
                 result.onSuccess { response ->
-                    Log.d(TAG, "✅ Loaded ${response.employees.size} employees")
+                    Log.d(TAG, "✅ Loaded ${response.employees.size} employees (raw)")
+                    val validEmployees = response.employees.filter { emp ->
+                        emp.fullName.isNotBlank() &&
+                        !emp.fullName.equals("unknown", ignoreCase = true)
+                    }
+                    Log.d(TAG, "✅ ${validEmployees.size} employees after filtering invalid names")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            employees = response.employees,
+                            employees = validEmployees,
                             companyDomain = response.companyDomain,
                             remainingSwipes = response.remainingSwipes,
                             totalAvailable = response.totalAvailable,
                             source = response.source,
-                            isEmpty = response.employees.isEmpty(),
-                            error = if (response.employees.isEmpty())
+                            isEmpty = validEmployees.isEmpty(),
+                            error = if (validEmployees.isEmpty())
                                 response.message ?: "No employee contacts found for this company"
                             else null
                         )

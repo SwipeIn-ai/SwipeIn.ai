@@ -213,7 +213,7 @@ fun HomeScreen(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 when {
                     uiState.isLoading -> ShimmerCardStack()
-                    uiState.error != null -> ErrorState(error = uiState.error!!, onRetry = { viewModel.refreshCards() })
+                    uiState.error != null -> ErrorState(error = uiState.error ?: "Unknown error", onRetry = { viewModel.refreshCards() })
                     uiState.isEmpty && !uiState.hasMorePages && !uiState.isLoadingMore -> {
                         EmptyState(
                             interestedCount = uiState.swipeHistory.count { it.isInterested },
@@ -221,11 +221,7 @@ fun HomeScreen(
                         )
                     }
                     uiState.cards.isEmpty() && (uiState.hasMorePages || uiState.isLoadingMore) -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                            CircularProgressIndicator(color = GradientStart, strokeWidth = 3.dp, modifier = Modifier.size(40.dp))
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(text = "Loading more jobs...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        ShimmerCardStack()
                     }
                     uiState.cards.isNotEmpty() -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -303,14 +299,16 @@ fun HomeScreen(
                 tonalElevation = 2.dp,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
-                CompanyDetailSheet(
-                    jobCard = uiState.selectedCard!!,
-                    onDismiss = { viewModel.dismissBottomSheet() },
-                    onFindPeople = {
-                        viewModel.dismissBottomSheet()
-                        onNavigateToEmployeeFinder(uiState.selectedCard!!.company.name)
-                    }
-                )
+                uiState.selectedCard?.let { card ->
+                    CompanyDetailSheet(
+                        jobCard = card,
+                        onDismiss = { viewModel.dismissBottomSheet() },
+                        onFindPeople = {
+                            viewModel.dismissBottomSheet()
+                            onNavigateToEmployeeFinder(card.company.name)
+                        }
+                    )
+                }
             }
         }
 

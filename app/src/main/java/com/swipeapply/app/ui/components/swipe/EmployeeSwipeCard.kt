@@ -101,7 +101,6 @@ fun EmployeeSwipeCard(
             ) { onClick() },
         shape = RoundedCornerShape(32.dp),
         color = cardBg,
-        shadowElevation = 8.dp,
         border = BorderStroke(
             if (swipeProgress > 0.05f) 3.dp else 1.dp,
             if (swipeProgress > 0.05f) activeBorderColor else CardBrandBorder
@@ -135,8 +134,8 @@ fun EmployeeSwipeCard(
                         DetailChips(employee = employee)
 
                         // LinkedIn
-                        if (!employee.linkedinUrl.isNullOrBlank()) {
-                            LinkedInRow(url = employee.linkedinUrl!!)
+                        employee.linkedinUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                            LinkedInRow(url = url)
                         }
                     }
 
@@ -410,8 +409,8 @@ private fun ConfidenceRow(employee: Employee, tierColor: Color) {
 @Composable
 private fun DetailChips(employee: Employee) {
     val chips = buildList {
-        if (!employee.department.isNullOrBlank()) add(Pair(Icons.Default.Work, employee.department!!))
-        if (!employee.seniority.isNullOrBlank())  add(Pair(Icons.Default.Work, employee.seniority!!))
+        employee.department?.takeIf { it.isNotBlank() }?.let { add(Pair(Icons.Default.Work, it)) }
+        employee.seniority?.takeIf { it.isNotBlank() }?.let { add(Pair(Icons.Default.Work, it)) }
     }
     if (chips.isEmpty()) return
 

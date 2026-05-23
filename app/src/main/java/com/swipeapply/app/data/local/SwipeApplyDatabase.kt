@@ -6,8 +6,10 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.swipeapply.app.data.local.dao.JobDao
+import com.swipeapply.app.data.local.dao.SavedContactDao
 import com.swipeapply.app.data.local.entity.Converters
 import com.swipeapply.app.data.local.entity.JobEntity
+import com.swipeapply.app.data.local.entity.SavedContactEntity
 import com.swipeapply.app.data.local.entity.SwipedJobEntity
 
 /**
@@ -18,16 +20,18 @@ import com.swipeapply.app.data.local.entity.SwipedJobEntity
  * - v2: Added SwipedJobEntity
  * - v3: Added userId to SwipedJobEntity (user-specific swipe tracking)
  * - v4: Added database indices on swiped_jobs for query performance
+ * - v5: Added SavedContactEntity for persisting saved contacts
  */
 @Database(
-    entities = [JobEntity::class, SwipedJobEntity::class], 
-    version = 4, 
+    entities = [JobEntity::class, SwipedJobEntity::class, SavedContactEntity::class], 
+    version = 5, 
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class SwipeApplyDatabase : RoomDatabase() {
     
     abstract fun jobDao(): JobDao
+    abstract fun savedContactDao(): SavedContactDao
     
     companion object {
         @Volatile

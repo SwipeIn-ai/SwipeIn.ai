@@ -16,8 +16,7 @@
         </trust-anchors>
     </domain-config>
 
-    <!-- Allow cleartext only for the backend server during development -->
-    <!-- TODO: Remove this exception once backend supports HTTPS -->
+    <!-- Backend server: enforce HTTPS in production -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">144.24.154.69</domain>
         <trust-anchors>

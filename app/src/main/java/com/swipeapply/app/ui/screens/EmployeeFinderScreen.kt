@@ -186,7 +186,7 @@ fun EmployeeFinderScreen(
                     }
                     uiState.error != null && uiState.employees.isEmpty() -> {
                         ErrorState(
-                            error = uiState.error!!,
+                            error = uiState.error ?: "Unknown error",
                             onRetry = { viewModel.loadEmployees(companyName) }
                         )
                     }
@@ -282,21 +282,23 @@ fun EmployeeFinderScreen(
                 tonalElevation = 2.dp,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
-                EmployeeDetailSheet(
-                    employee = selectedEmployee!!,
-                    companyName = companyName,
-                    onDismiss = { selectedEmployee = null },
-                    onCopyEmail = { email ->
-                        copyToClipboard(context, email)
-                    },
-                    onOpenLinkedIn = { url ->
-                        openUrl(context, url)
-                    },
-                    onSendReferralEmail = { employee ->
-                        selectedEmployee = null
-                        emailTargetEmployee = employee
-                    }
-                )
+                selectedEmployee?.let { employee ->
+                    EmployeeDetailSheet(
+                        employee = employee,
+                        companyName = companyName,
+                        onDismiss = { selectedEmployee = null },
+                        onCopyEmail = { email ->
+                            copyToClipboard(context, email)
+                        },
+                        onOpenLinkedIn = { url ->
+                            openUrl(context, url)
+                        },
+                        onSendReferralEmail = { emp ->
+                            selectedEmployee = null
+                            emailTargetEmployee = emp
+                        }
+                    )
+                }
             }
         }
 
@@ -332,16 +334,17 @@ fun EmployeeFinderScreen(
                 tonalElevation = 2.dp,
                 dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
-                ReferralEmailComposerContent(
-                    employee = emailTargetEmployee!!,
-                    companyName = companyName,
-                    jobTitle = null, // Could be passed from job context if available
-                    onDismiss = { emailTargetEmployee = null },
-                    onEmailSent = { 
-                        emailTargetEmployee = null
-                        // Could show success snackbar here
-                    }
-                )
+                emailTargetEmployee?.let { employee ->
+                    ReferralEmailComposerContent(
+                        employee = employee,
+                        companyName = companyName,
+                        jobTitle = null,
+                        onDismiss = { emailTargetEmployee = null },
+                        onEmailSent = { 
+                            emailTargetEmployee = null
+                        }
+                    )
+                }
             }
         }
     }
@@ -1098,7 +1101,7 @@ private fun EmployeeDetailSheet(
                 color = LinkedInBlue.copy(alpha = 0.06f),
                 border = BorderStroke(1.dp, LinkedInBlue.copy(alpha = 0.15f)),
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { onOpenLinkedIn(employee.linkedinUrl!!) }
+                onClick = { employee.linkedinUrl?.let { onOpenLinkedIn(it) } }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

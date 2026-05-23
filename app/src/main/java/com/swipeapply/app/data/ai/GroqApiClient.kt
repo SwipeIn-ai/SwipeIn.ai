@@ -161,7 +161,7 @@ object GroqApiClient {
             } catch (e: Exception) {
                 lastError = "Unexpected error: ${e.message}"
                 Log.e(TAG, "Unexpected error on attempt $attempt", e)
-                return@withContext GroqResult.Error(lastError!!)
+                return@withContext GroqResult.Error(lastError ?: "Unexpected error")
             }
         }
 

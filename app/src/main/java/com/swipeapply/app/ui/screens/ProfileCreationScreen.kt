@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -116,7 +117,7 @@ fun ProfileCreationScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BrandBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Decorative Background Blobs
         Box(
@@ -156,12 +157,14 @@ fun ProfileCreationScreen(
                     )
                 }
                 else -> {
-                    ProfileConfirmationState(
-                        profile = state.profile!!,
-                        error = state.error,
-                        viewModel = viewModel,
-                        onBack = { viewModel.updateProfileField(null) }
-                    )
+                    state.profile?.let { profile ->
+                        ProfileConfirmationState(
+                            profile = profile,
+                            error = state.error,
+                            viewModel = viewModel,
+                            onBack = { viewModel.updateProfileField(null) }
+                        )
+                    }
                 }
             }
         }
@@ -540,6 +543,7 @@ private fun ProfileConfirmationState(
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
         ) {
             // Profile Picture Placeholder
             Box(modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp)) {

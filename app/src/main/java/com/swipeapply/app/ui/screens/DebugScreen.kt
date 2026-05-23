@@ -50,6 +50,11 @@ import java.util.concurrent.TimeUnit
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugScreen(onBack: () -> Unit) {
+    // Guard: never show debug info in release builds
+    if (!com.swipeapply.app.BuildConfig.DEBUG) {
+        onBack()
+        return
+    }
     var apiResponse by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }

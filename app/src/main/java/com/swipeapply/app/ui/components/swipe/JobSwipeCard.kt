@@ -97,7 +97,6 @@ fun JobSwipeCard(
             ) { onClick() },
         shape = RoundedCornerShape(32.dp),
         color = cardBg,
-        shadowElevation = 8.dp,
         border = BorderStroke(if (swipeProgress > 0.05f) 3.dp else 1.dp, if (swipeProgress > 0.05f) activeBorderColor else borderColor)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

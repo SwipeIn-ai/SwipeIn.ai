@@ -176,7 +176,7 @@ fun TermsScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "support@swipein.app",
+                text = "swipein.ai@gmail.com",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold

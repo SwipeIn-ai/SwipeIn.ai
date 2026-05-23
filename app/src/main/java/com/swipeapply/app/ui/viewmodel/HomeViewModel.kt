@@ -76,6 +76,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val streakManager = StreakManager.getInstance(application.applicationContext)
 
+    private val exceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "Unhandled coroutine exception: ${throwable.message}", throwable)
+        _uiState.update { it.copy(isLoading = false, error = "Something went wrong. Please try again.") }
+    }
+
     private val _uiState = MutableStateFlow(
         HomeUiState(
             currentStreak = streakManager.currentStreak,
@@ -114,7 +119,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      * This ensures HR resume gets HR jobs, SDE resume gets SDE jobs.
      */
     private fun fetchUserProfileThenLoadCards() {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
             try {
@@ -138,6 +143,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 loadCardsWithCurrentSearch()
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching profile: ${e.message}")
+                _uiState.update { it.copy(error = "Could not load your profile. Showing all jobs.") }
                 // Fall back to loading without profile filter
                 loadCardsWithCurrentSearch()
             }
@@ -175,10 +181,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // Remove duplicates and empty strings — use ALL keywords, no limit
+        // Remove duplicates and empty strings — cap at 15 to prevent oversized API queries
         val uniqueKeywords = allKeywords
             .filter { it.isNotBlank() && it.length > 1 }
             .distinct()
+            .take(15)
         
         if (uniqueKeywords.isEmpty()) {
             Log.d(TAG, "No keywords found in profile, using default search")
@@ -187,8 +194,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         
         // Join with spaces — FindWork API treats space-separated terms as keyword search
         val query = uniqueKeywords.joinToString(" ")
-        Log.d(TAG, "🔍 Keywords (${uniqueKeywords.size}): $uniqueKeywords")
-        Log.d(TAG, "🔍 Search query: $query")
+        Log.i(TAG, "Search keywords (${uniqueKeywords.size}): $uniqueKeywords")
         return query
     }
 

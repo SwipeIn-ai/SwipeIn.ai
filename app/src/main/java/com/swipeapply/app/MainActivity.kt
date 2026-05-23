@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
         NotificationScheduler.schedulePeriodicChecks(this)
         requestNotificationPermissionIfNeeded()
 
+        // Initialize contact persistence (loads saved contacts from Room DB)
+        com.swipeapply.app.data.repository.SavedContactsRepository.initialize(this)
+
         PDFBoxResourceLoader.init(applicationContext)
         setContent {
             val darkModeEnabled = rememberSaveable { mutableStateOf<Boolean?>(false) }

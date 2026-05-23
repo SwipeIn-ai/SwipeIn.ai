@@ -55,7 +55,7 @@ class EmployeeRepository {
             )
 
             if (response.isSuccessful && response.body() != null) {
-                val body = response.body()!!
+                val body = response.body() ?: return@withContext Result.failure(Exception("Empty response"))
                 Log.d(TAG, "Found ${body.employees.size} employees")
                 Log.d(TAG, "Remaining swipes: ${body.remainingSwipes}")
                 Result.success(body)
