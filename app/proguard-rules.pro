@@ -10,3 +10,6 @@
 
 # Keep Compose classes
 -keep class androidx.compose.** { *; }
+
+# Suppress R8 warning for optional PDFBox dependency
+-dontwarn com.gemalto.jp2.JP2Decoder

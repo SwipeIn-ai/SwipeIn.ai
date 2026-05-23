@@ -10,6 +10,10 @@ local.properties
 .env
 *.env.*
 
+# Signing keystores
+*.jks
+*.keystore
+
 # Android Studio / IntelliJ IDEA
 .idea/
 *.iml

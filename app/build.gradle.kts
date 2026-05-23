@@ -71,9 +71,19 @@ android {
             )
         }
     }
+    
+    signingConfigs {
+        create("release") {
+            storeFile = file("swipein-release-key-new.jks")
+            storePassword = "Ss@sudhir87"
+            keyAlias = "swipein"
+            keyPassword = "Ss@sudhir87"
+        }
+    }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwipeIn — Privacy Policy & Terms of Service</title>
+    <meta name="description" content="SwipeIn Privacy Policy and Terms of Service. Learn how we collect, use, and protect your information.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-alt: #1a1a26;
+            --border: #2a2a3a;
+            --text: #e8e8f0;
+            --text-muted: #9090a8;
+            --primary: #6c5ce7;
+            --primary-light: #a29bfe;
+            --accent: #00cec9;
+            --accent-light: #55efc4;
+            --gradient-1: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            --gradient-2: linear-gradient(135deg, #00cec9, #55efc4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 20px 50px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(108,92,231,0.1) 0%, transparent 60%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .hero-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 0 20px;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tab-btn {
+            padding: 12px 28px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--primary);
+            color: var(--text);
+        }
+
+        .tab-btn.active {
+            background: var(--gradient-1);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(108, 92, 231, 0.3);
+        }
+
+        /* Content */
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+        }
+
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .last-updated {
+            display: inline-block;
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 36px;
+        }
+
+        .last-updated strong {
+            color: var(--accent);
+        }
+
+        .section-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            border-color: rgba(108, 92, 231, 0.3);
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 1.3rem;
+        }
+
+        .subsection-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--primary-light);
+            margin: 16px 0 6px;
+        }
+
+        .section-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.75;
+        }
+
+        .bullet-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+
+        .bullet-list li {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            padding: 5px 0 5px 24px;
+            position: relative;
+        }
+
+        .bullet-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 13px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--gradient-2);
+        }
+
+        .contact-email {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 10px 20px;
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--primary-light);
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .contact-email:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(108, 92, 231, 0.15);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .footer span {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .hero { padding: 50px 20px 30px; }
+            .logo { font-size: 2rem; }
+            .tab-nav { flex-direction: column; align-items: center; }
+            .tab-btn { width: 100%; max-width: 280px; text-align: center; }
+            .section-card { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hero -->
+    <header class="hero">
+        <div class="hero-content">
+            <h1 class="logo">SwipeIn</h1>
+            <p class="hero-subtitle">AI-powered job search with smart swiping and employee referrals</p>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" onclick="showTab('privacy')">Privacy Policy</button>
+        <button class="tab-btn" onclick="showTab('terms')">Terms of Service</button>
+    </nav>
+
+    <!-- Content -->
+    <main class="container">
+
+        <!-- ======================== PRIVACY POLICY ======================== -->
+        <div id="privacy" class="content-section active">
+
+            <div class="last-updated">Last updated: <strong>May 1, 2026</strong></div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🛡️</span> Introduction</h2>
+                <p>SwipeIn ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this policy carefully. If you do not agree with the terms of this policy, please do not use the app.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📋</span> Information We Collect</h2>
+                <h3 class="subsection-title">Account Information</h3>
+                <p>When you create an account, we collect information you provide such as your name, email address, and profile details through Google or LinkedIn sign-in.</p>
+                <h3 class="subsection-title">Profile Information</h3>
+                <p>You may choose to provide additional information such as your bio, skills, tech stack, work experience, education, and phone number. If you upload a resume, we process it locally on your device to extract profile data.</p>
+                <h3 class="subsection-title">Usage Data</h3>
+                <p>We collect information about how you interact with the app, including job swipes, saved jobs, and application status updates. This data helps us improve your experience and provide better job recommendations.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">⚙️</span> How We Use Your Information</h2>
+                <ul class="bullet-list">
+                    <li>To provide and maintain the app's functionality</li>
+                    <li>To match you with relevant job opportunities</li>
+                    <li>To help you discover referral contacts at companies</li>
+                    <li>To generate personalized outreach messages (only with your explicit consent)</li>
+                    <li>To send you notifications about new job matches and follow-ups (optional)</li>
+                    <li>To improve our services and user experience</li>
+                </ul>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🤖</span> AI-Powered Features</h2>
+                <p>Some features use AI to generate personalized email drafts and rank jobs by relevance. These features require your explicit opt-in consent. When enabled, relevant profile details are sent to our AI service provider to generate content. You always review and edit any AI-generated content before it is sent.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🔒</span> Data Storage & Security</h2>
+                <p>Your account data is stored securely using industry-standard encryption. Job swipe history and preferences are stored locally on your device. We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, or destruction.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🔗</span> Third-Party Services</h2>
+                <p>We use the following third-party services:</p>
+                <ul class="bullet-list">
+                    <li>Google and LinkedIn for authentication</li>
+                    <li>Supabase for secure account management</li>
+                    <li>AI service providers for optional personalization features</li>
+                </ul>
+                <p style="margin-top: 12px;">Each third-party service has its own privacy policy governing the use of your information. We encourage you to review their policies.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">✅</span> Your Rights & Choices</h2>
+                <ul class="bullet-list">
+                    <li>Access and update your profile information at any time</li>
+                    <li>Opt out of AI personalization features</li>
+                    <li>Decline notification permissions without affecting core functionality</li>
+                    <li>Delete your account and associated data from Settings</li>
+                    <li>Sign out and clear local data at any time</li>
+                </ul>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🗄️</span> Data Retention</h2>
+                <p>We retain your account data for as long as your account is active. When you delete your account, we remove your personal data from our systems. Local data on your device is cleared when you sign out or uninstall the app.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">👶</span> Children's Privacy</h2>
+                <p>SwipeIn is not intended for use by anyone under the age of 16. We do not knowingly collect personal information from children under 16. If we become aware that we have collected personal data from a child, we will take steps to delete that information.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🔄</span> Changes to This Policy</h2>
+                <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy within the app. You are advised to review this policy periodically for any changes.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📧</span> Contact Us</h2>
+                <p>If you have questions or concerns about this Privacy Policy or your data, please contact us at:</p>
+                <a href="mailto:swipein.ai@gmail.com" class="contact-email">swipein.ai@gmail.com</a>
+            </div>
+
+        </div>
+
+        <!-- ======================== TERMS OF SERVICE ======================== -->
+        <div id="terms" class="content-section">
+
+            <div class="last-updated">Last updated: <strong>May 1, 2026</strong></div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📜</span> 1. Acceptance of Terms</h2>
+                <p>By accessing or using SwipeIn ("the App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the App. We may modify these Terms at any time, and your continued use of the App constitutes acceptance of any changes.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🎂</span> 2. Eligibility</h2>
+                <p>You must be at least 16 years old to use the App. By using the App, you represent and warrant that you meet this age requirement and have the legal capacity to enter into these Terms.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">👤</span> 3. Account Registration</h2>
+                <p>To use certain features, you must create an account using Google or LinkedIn sign-in. You are responsible for maintaining the confidentiality of your account and for all activities that occur under your account. You agree to provide accurate and complete information and to update it as necessary.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">✔️</span> 4. Permitted Use</h2>
+                <p>You agree to use the App only for lawful purposes and in accordance with these Terms. You agree NOT to:</p>
+                <ul class="bullet-list">
+                    <li>Use the App for any illegal or unauthorized purpose</li>
+                    <li>Impersonate any person or entity</li>
+                    <li>Send spam, unsolicited messages, or harass others</li>
+                    <li>Attempt to gain unauthorized access to our systems</li>
+                    <li>Use automated scripts to access or scrape the App</li>
+                    <li>Upload malicious content or viruses</li>
+                </ul>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">💼</span> 5. Job Listings & Referrals</h2>
+                <p>Job listings displayed in the App are sourced from third-party providers. We do not guarantee the accuracy, completeness, or availability of any job listing. Referral contact information is provided to help you network professionally. You agree to use this information responsibly and in compliance with applicable laws.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🤖</span> 6. AI-Generated Content</h2>
+                <p>The App may offer AI-powered features to generate email drafts and personalized content. These features require your explicit consent. AI-generated content is provided as a suggestion only. You are solely responsible for reviewing, editing, and sending any messages. We are not responsible for the content of messages you send.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📝</span> 7. User Content</h2>
+                <p>You retain ownership of any content you submit to the App (profile information, resume data, etc.). By submitting content, you grant us a limited license to use, process, and store it solely for the purpose of providing the App's services to you.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🔐</span> 8. Privacy</h2>
+                <p>Your use of the App is also governed by our <a href="#" onclick="showTab('privacy'); return false;" style="color: var(--primary-light); text-decoration: underline;">Privacy Policy</a>, which describes how we collect, use, and protect your information. By using the App, you consent to the collection and use of information as described in our Privacy Policy.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">🚫</span> 9. Termination</h2>
+                <p>We reserve the right to suspend or terminate your account at any time for violation of these Terms or for any other reason at our discretion. You may delete your account at any time through the App's settings. Upon termination, your right to use the App will immediately cease.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">⚠️</span> 10. Disclaimers</h2>
+                <p>The App is provided on an "as is" and "as available" basis without warranties of any kind, either express or implied. We do not warrant that the App will be uninterrupted, error-free, or secure. We do not guarantee any specific outcomes from using the App, including job placement or referral success.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">⚖️</span> 11. Limitation of Liability</h2>
+                <p>To the maximum extent permitted by law, SwipeIn and its affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the App.</p>
+            </div>
+
+            <div class="section-card">
+                <h2 class="section-title"><span class="icon">📧</span> 12. Contact Us</h2>
+                <p>If you have questions about these Terms, please contact us at:</p>
+                <a href="mailto:swipein.ai@gmail.com" class="contact-email">swipein.ai@gmail.com</a>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 <span>SwipeIn</span>. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function showTab(tab) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+            // Show selected section
+            document.getElementById(tab).classList.add('active');
+
+            // Activate clicked button
+            const buttons = document.querySelectorAll('.tab-btn');
+            if (tab === 'privacy') buttons[0].classList.add('active');
+            else buttons[1].classList.add('active');
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Handle direct URL hash navigation
+        if (window.location.hash === '#terms') showTab('terms');
+    </script>
+
+</body>
+</html>
