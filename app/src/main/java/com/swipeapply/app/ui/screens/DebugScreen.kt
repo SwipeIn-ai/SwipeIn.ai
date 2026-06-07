@@ -115,7 +115,7 @@ fun DebugScreen(onBack: () -> Unit) {
                     apiResponse += "\n[Job $index]\n"
                     apiResponse += "  ID: ${job.id}\n"
                     apiResponse += "  Company: ${job.companyName}\n"
-                    apiResponse += "  Role: ${job.role.take(40)}...\n"
+                    apiResponse += "  Role: ${job.role?.take(40)}...\n"
                     apiResponse += "  Location: ${job.location ?: "null -> Remote"}\n"
                     apiResponse += "  Remote: ${job.remote}\n"
 

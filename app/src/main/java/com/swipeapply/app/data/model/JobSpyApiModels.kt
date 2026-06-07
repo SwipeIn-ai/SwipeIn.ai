@@ -24,9 +24,9 @@ data class JobSpyJob(
     @SerializedName("source")
     val source: String? = null,
     @SerializedName("title")
-    val title: String,
+    val title: String?,
     @SerializedName("company")
-    val company: String,
+    val company: String?,
     @SerializedName("location")
     val location: String? = null,
     @SerializedName("city")

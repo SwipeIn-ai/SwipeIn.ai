@@ -6,7 +6,7 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Keep data classes for serialization
--keep class com.swipeapply.app.data.model.** { *; }
+-keep class com.swipeapply.app.data.** { *; }
 
 # Keep Compose classes
 -keep class androidx.compose.** { *; }

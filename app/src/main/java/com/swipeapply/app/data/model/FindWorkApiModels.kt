@@ -20,9 +20,9 @@ data class FindWorkJob(
     @SerializedName("id")
     val id: String,
     @SerializedName("role")
-    val role: String,
+    val role: String?,
     @SerializedName("company_name")
-    val companyName: String,
+    val companyName: String?,
     @SerializedName("location")
     val location: String? = null,
     @SerializedName("remote")

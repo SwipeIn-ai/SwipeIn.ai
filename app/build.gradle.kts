@@ -20,8 +20,8 @@ android {
         applicationId = "com.swipeapply.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 5
+        versionName = "1.3.1"
 
         val geminiKey = envProperties.getProperty("GEMINI_API_KEY") ?: ""
         buildConfigField(
@@ -90,6 +90,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             isMinifyEnabled = false

@@ -403,6 +403,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 state.copy(
                     cards = currentList,
                     isEmpty = currentList.isEmpty() && nextJob == null,
+                    hasMorePages = repository.hasMorePages(),
                     interestedCards = if (direction == SwipeDirection.RIGHT) state.interestedCards + card else state.interestedCards,
                     skippedCards = if (direction == SwipeDirection.LEFT) state.skippedCards + card else state.skippedCards,
                     swipeHistory = listOf(historyEntry) + state.swipeHistory.filterNot { it.card.id == card.id },

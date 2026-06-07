@@ -433,8 +433,8 @@ private fun AnimatedLogoHero() {
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = "android.resource://com.swipeapply.app/drawable/app_logo",
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.swipeapply.app.R.drawable.app_logo),
                     contentDescription = "App Logo",
                     modifier = Modifier
                         .size(logoImage)

@@ -131,6 +131,7 @@ import com.swipeapply.app.ui.viewmodel.UndoableAction
 import com.swipeapply.app.ui.viewmodel.ViewModelFactory
 import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -363,12 +364,15 @@ fun HomeScreen(
                         showSettingsSheet = false
                         scope.launch {
                             try {
+                                supabase.postgrest.rpc("delete_user")
                                 viewModel.performSignOut()
                                 com.swipeapply.app.data.repository.UserSyncRepository.clearSession()
                                 com.swipeapply.app.data.repository.SavedContactsRepository.clearAll()
                                 supabase.auth.signOut(scope = SignOutScope.LOCAL)
                                 delay(250L)
-                            } catch (_: Exception) { } finally { onSignOutSuccess() }
+                            } catch (e: Exception) { 
+                                e.printStackTrace() 
+                            } finally { onSignOutSuccess() }
                         }
                     },
                     onUndoAll = {

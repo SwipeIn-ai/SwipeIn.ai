@@ -26,8 +26,8 @@ fun FindWorkJob.toEntity(): JobEntity {
             .trim()
     }
         // Safely trim and validate
-        val roleText = this.role.trim().takeIf { it.isNotEmpty() } ?: "Unknown Role"
-        val companyText = this.companyName.trim().takeIf { it.isNotEmpty() } ?: "Unknown Company"
+        val roleText = this.role?.trim()?.takeIf { it.isNotEmpty() } ?: "Unknown Role"
+        val companyText = this.companyName?.trim()?.takeIf { it.isNotEmpty() } ?: "Unknown Company"
         val locationText = this.location?.trim() ?: "Remote"
         
         
@@ -67,12 +67,12 @@ fun JobSpyJob.toEntity(): JobEntity {
                 .replace(Regex("\\s+"), " ")
                 .trim()
         }
-        val titleText = this.title.trim().takeIf { it.isNotEmpty() } ?: "Unknown Role"
-        val companyText = this.company.trim().takeIf { it.isNotEmpty() } ?: "Unknown Company"
+        val titleText = this.title?.trim()?.takeIf { it.isNotEmpty() } ?: "Unknown Role"
+        val companyText = this.company?.trim()?.takeIf { it.isNotEmpty() } ?: "Unknown Company"
         val locationText = buildJobSpyLocation()
 
         // Extract keywords from title and description
-        val keywords = extractKeywordsFromDescription(this.description, this.title)
+        val keywords = extractKeywordsFromDescription(this.description, this.title ?: "")
 
         val entity = JobEntity(
             id = "jobspy_${this.id.trim()}",
