@@ -265,14 +265,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         onFailure = { exception ->
                             Log.e(TAG, "loadCards() - FAILURE: ${exception.message}", exception)
                             _uiState.update {
-                                it.copy(isLoading = false, error = exception.message ?: "Failed to load jobs")
+                                it.copy(
+                                    isLoading = false,
+                                    isEmpty = it.cards.isEmpty(),
+                                    hasMorePages = false,
+                                    error = exception.message ?: "Failed to load jobs"
+                                )
                             }
                         }
                     )
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "loadCards() - EXCEPTION: ${e.message}", e)
-                _uiState.update { it.copy(isLoading = false, error = e.message ?: "An unexpected error occurred") }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isEmpty = it.cards.isEmpty(),
+                        hasMorePages = false,
+                        error = e.message ?: "An unexpected error occurred"
+                    )
+                }
             }
         }
     }

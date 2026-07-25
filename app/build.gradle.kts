@@ -20,8 +20,8 @@ android {
         applicationId = "com.swipeapply.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 9
+        versionName = "1.3.5"
 
         val geminiKey = envProperties.getProperty("GEMINI_API_KEY") ?: ""
         buildConfigField(
